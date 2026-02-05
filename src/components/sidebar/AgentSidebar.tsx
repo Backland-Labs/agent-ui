@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Inbox, Bot } from "lucide-react";
+import { Inbox, CircleDot } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -29,9 +29,8 @@ export function AgentSidebar({ agents }: AgentSidebarProps) {
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center gap-2 px-2 py-1">
-          <Bot className="h-6 w-6" />
-          <span className="font-semibold">Agent UI</span>
+        <div className="flex items-center gap-2 px-2 py-1.5">
+          <span className="font-mono text-xs font-semibold uppercase tracking-widest text-foreground">Agent UI</span>
         </div>
       </SidebarHeader>
 
@@ -52,7 +51,7 @@ export function AgentSidebar({ agents }: AgentSidebarProps) {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Agents</SidebarGroupLabel>
+          <SidebarGroupLabel className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Agents</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {agents.map((agent) => (
@@ -63,7 +62,7 @@ export function AgentSidebar({ agents }: AgentSidebarProps) {
                     tooltip={agent.description}
                   >
                     <Link href={`/inbox?agent=${agent.id}`}>
-                      <span className="text-lg">{agent.icon || "🤖"}</span>
+                      <CircleDot className="h-3.5 w-3.5 text-muted-foreground" />
                       <span>{agent.name}</span>
                     </Link>
                   </SidebarMenuButton>

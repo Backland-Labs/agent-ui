@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { MessageSquare } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageBubble } from "./MessageBubble";
 
@@ -29,8 +30,8 @@ export function MessageList({ messages, agentIcon, isLoading }: MessageListProps
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
         <div className="text-center">
-          <div className="text-4xl mb-4">💬</div>
-          <p>Send a message to start the conversation</p>
+          <MessageSquare className="h-6 w-6 mx-auto mb-2 text-muted-foreground/25" />
+          <p className="text-xs">Send a message to start</p>
         </div>
       </div>
     );
@@ -38,7 +39,7 @@ export function MessageList({ messages, agentIcon, isLoading }: MessageListProps
 
   return (
     <ScrollArea className="flex-1" ref={scrollRef}>
-      <div className="flex flex-col">
+      <div className="flex flex-col py-4">
         {messages.map((message) => (
           <MessageBubble
             key={message.id}

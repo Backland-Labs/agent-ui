@@ -45,19 +45,19 @@ export function NewThreadDialog({ agents }: NewThreadDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="w-full">
-          <Plus className="h-4 w-4 mr-2" />
+        <Button variant="outline" size="sm" className="w-full">
+          <Plus className="h-3.5 w-3.5" />
           New Thread
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[380px]">
         <DialogHeader>
-          <DialogTitle>Start a new conversation</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-sm font-medium">New conversation</DialogTitle>
+          <DialogDescription className="text-xs">
             Choose an agent to start chatting with.
           </DialogDescription>
         </DialogHeader>
-        <div className="py-4">
+        <div className="py-3">
           <Select value={selectedAgent} onValueChange={setSelectedAgent}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select an agent" />
@@ -65,16 +65,13 @@ export function NewThreadDialog({ agents }: NewThreadDialogProps) {
             <SelectContent>
               {agents.map((agent) => (
                 <SelectItem key={agent.id} value={agent.id}>
-                  <div className="flex items-center gap-2">
-                    <span>{agent.icon || "🤖"}</span>
-                    <div>
-                      <div className="font-medium">{agent.name}</div>
-                      {agent.description && (
-                        <div className="text-xs text-muted-foreground">
-                          {agent.description}
-                        </div>
-                      )}
-                    </div>
+                  <div>
+                    <div className="text-sm">{agent.name}</div>
+                    {agent.description && (
+                      <div className="text-xs text-muted-foreground">
+                        {agent.description}
+                      </div>
+                    )}
                   </div>
                 </SelectItem>
               ))}
@@ -82,11 +79,11 @@ export function NewThreadDialog({ agents }: NewThreadDialogProps) {
           </Select>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setIsOpen(false)}>
+          <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
             Cancel
           </Button>
-          <Button onClick={handleCreate} disabled={!selectedAgent}>
-            Start Chat
+          <Button size="sm" onClick={handleCreate} disabled={!selectedAgent}>
+            Start
           </Button>
         </DialogFooter>
       </DialogContent>

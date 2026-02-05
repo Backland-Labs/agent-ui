@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { Inbox } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InboxItem } from "./InboxItem";
@@ -18,16 +19,14 @@ export function InboxList({ threads, loading, activeThreadId }: InboxListProps) 
 
   if (loading) {
     return (
-      <div className="space-y-3 p-4">
+      <div className="divide-y">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="p-4 border rounded-lg">
-            <div className="flex items-start gap-3">
-              <Skeleton className="h-10 w-10 rounded-full" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3 w-1/4" />
-                <Skeleton className="h-3 w-full" />
-              </div>
+          <div key={i} className="flex items-start gap-3.5 px-6 py-4">
+            <Skeleton className="h-8 w-8 rounded-md" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-3.5 w-2/3" />
+              <Skeleton className="h-3 w-1/4" />
+              <Skeleton className="h-3 w-full" />
             </div>
           </div>
         ))}
@@ -37,13 +36,13 @@ export function InboxList({ threads, loading, activeThreadId }: InboxListProps) 
 
   if (threads.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-center px-4">
-        <div className="text-4xl mb-4">📭</div>
-        <h3 className="font-medium text-lg">No conversations yet</h3>
-        <p className="text-muted-foreground mt-2">
+      <div className="flex flex-col items-center justify-center h-64 text-center px-6">
+        <Inbox className="h-6 w-6 text-muted-foreground/30 mb-3" />
+        <h3 className="text-sm font-medium">No conversations</h3>
+        <p className="text-xs text-muted-foreground mt-1">
           {agentFilter
             ? "Start a new conversation with this agent"
-            : "Select an agent from the sidebar to start chatting"}
+            : "Select an agent to begin"}
         </p>
       </div>
     );
@@ -51,7 +50,7 @@ export function InboxList({ threads, loading, activeThreadId }: InboxListProps) 
 
   return (
     <ScrollArea className="h-full">
-      <div className="space-y-3 p-4">
+      <div className="divide-y">
         {threads.map((thread) => (
           <InboxItem
             key={thread.id}

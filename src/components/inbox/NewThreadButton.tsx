@@ -46,31 +46,30 @@ export function NewThreadButton({
 
   if (agents.length === 1) {
     return (
-      <Button onClick={handleCreate} disabled={isCreating}>
-        <Plus className="h-4 w-4 mr-2" />
-        {isCreating ? "Creating..." : "New Thread"}
+      <Button size="sm" onClick={handleCreate} disabled={isCreating}>
+        <Plus className="h-3.5 w-3.5" />
+        {isCreating ? "Creating..." : "New"}
       </Button>
     );
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5">
       <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-[150px] h-8 text-xs">
           <SelectValue placeholder="Select agent" />
         </SelectTrigger>
         <SelectContent>
           {agents.map((agent) => (
             <SelectItem key={agent.id} value={agent.id}>
-              <span className="mr-2">{agent.icon || "🤖"}</span>
               {agent.name}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
-      <Button onClick={handleCreate} disabled={isCreating || !selectedAgent}>
-        <Plus className="h-4 w-4 mr-2" />
-        {isCreating ? "Creating..." : "New"}
+      <Button size="sm" onClick={handleCreate} disabled={isCreating || !selectedAgent}>
+        <Plus className="h-3.5 w-3.5" />
+        {isCreating ? "..." : "New"}
       </Button>
     </div>
   );

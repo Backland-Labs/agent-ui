@@ -36,30 +36,32 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="flex items-center justify-center min-h-[400px] p-4">
-          <Card className="w-full max-w-md">
+        <div className="flex items-center justify-center min-h-[400px] p-6">
+          <Card className="w-full max-w-sm border-border/60">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-sm font-medium text-destructive">
+                <AlertTriangle className="h-4 w-4" />
                 Something went wrong
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 An error occurred while loading this content. Please try refreshing the page.
               </p>
               {this.state.error && (
-                <pre className="mt-4 p-2 bg-muted rounded text-xs overflow-auto">
+                <pre className="mt-3 p-2.5 bg-muted/50 rounded-lg text-[11px] overflow-auto text-muted-foreground">
                   {this.state.error.message}
                 </pre>
               )}
             </CardContent>
             <CardFooter>
               <Button
+                variant="outline"
+                size="sm"
                 onClick={() => window.location.reload()}
                 className="w-full"
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                 Refresh Page
               </Button>
             </CardFooter>

@@ -21,7 +21,7 @@ const mockThreads: InboxItem[] = [
     last_activity_at: new Date().toISOString(),
     created_at: new Date(Date.now() - 3600000).toISOString(),
     agent_name: "Mock Assistant",
-    agent_icon: "🤖",
+    agent_icon: null,
     last_message: "Hello! I'm a mock AI assistant for testing the Agent UI.",
     last_message_role: "assistant",
     last_message_at: new Date().toISOString(),
@@ -34,7 +34,7 @@ const mockThreads: InboxItem[] = [
     last_activity_at: new Date(Date.now() - 7200000).toISOString(),
     created_at: new Date(Date.now() - 86400000).toISOString(),
     agent_name: "Mock Assistant",
-    agent_icon: "🤖",
+    agent_icon: null,
     last_message: "The Agent UI is built with Next.js, TypeScript, and shadcn/ui...",
     last_message_role: "assistant",
     last_message_at: new Date(Date.now() - 7200000).toISOString(),
@@ -71,7 +71,7 @@ export function InboxContent({ agents }: InboxContentProps) {
       last_activity_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
       agent_name: agents.find((a) => a.id === agentId)?.name || "Unknown Agent",
-      agent_icon: agents.find((a) => a.id === agentId)?.icon || "🤖",
+      agent_icon: null,
       last_message: null,
       last_message_role: null,
       last_message_at: null,
@@ -83,14 +83,14 @@ export function InboxContent({ agents }: InboxContentProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex items-center justify-between px-6 py-4 border-b">
         <div>
-          <h2 className="text-lg font-medium">
+          <h2 className="text-sm font-medium">
             {agentFilter
-              ? `${agents.find((a) => a.id === agentFilter)?.name || "Agent"} Threads`
+              ? `${agents.find((a) => a.id === agentFilter)?.name || "Agent"}`
               : "All Threads"}
           </h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="font-mono text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wider">
             {threads.length} conversation{threads.length !== 1 ? "s" : ""}
           </p>
         </div>

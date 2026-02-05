@@ -30,14 +30,15 @@ export default async function ThreadPage({ params, searchParams }: ThreadPagePro
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mr-2 h-4" />
-        <div className="flex items-center gap-2">
-          <span className="text-xl">{agent.icon || "🤖"}</span>
+        <div className="flex items-center gap-2.5">
+          <div className="h-6 w-6 rounded bg-foreground text-background flex items-center justify-center text-[10px] font-medium">
+            {agent.name.charAt(0).toUpperCase()}
+          </div>
           <div>
-            <h1 className="font-semibold">{agent.name}</h1>
-            <p className="text-xs text-muted-foreground">{agent.description}</p>
+            <h1 className="text-sm font-medium">{agent.name}</h1>
           </div>
         </div>
       </header>
@@ -53,16 +54,16 @@ export default async function ThreadPage({ params, searchParams }: ThreadPagePro
 function ThreadSkeleton() {
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 p-4 space-y-4">
+      <div className="flex-1 px-6 py-5 space-y-5">
         {[...Array(3)].map((_, i) => (
           <div key={i} className="flex gap-3">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <Skeleton className="h-20 flex-1 rounded-lg" />
+            <Skeleton className="h-7 w-7 rounded-full" />
+            <Skeleton className="h-16 flex-1 rounded-2xl" />
           </div>
         ))}
       </div>
-      <div className="border-t p-4">
-        <Skeleton className="h-12 w-full rounded-lg" />
+      <div className="border-t px-6 py-4">
+        <Skeleton className="h-11 w-full rounded-xl" />
       </div>
     </div>
   );
