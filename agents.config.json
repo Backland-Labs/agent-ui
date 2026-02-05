@@ -1,0 +1,18 @@
+{
+  "agents": [
+    {
+      "id": "mock-assistant",
+      "name": "Mock Assistant",
+      "endpoint_url": "http://localhost:3000/api/mock-agent",
+      "icon": "🤖",
+      "description": "A mock agent for testing the UI"
+    },
+    {
+      "id": "claude-coder",
+      "name": "Claude Coder",
+      "endpoint_url": "http://localhost:8001/agui",
+      "icon": "💻",
+      "description": "Coding assistant powered by Claude"
+    }
+  ]
+}

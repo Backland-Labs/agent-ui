@@ -256,27 +256,27 @@ agent-ui/
 ## Acceptance Criteria
 
 ### Core Functionality
-- [ ] Connect to multiple AG-UI agent endpoints defined in config
-- [ ] Display agent sidebar showing all registered agents with status
-- [ ] Show inbox list of all threads, ordered by last activity
-- [ ] Create new thread with selected agent
-- [ ] Stream messages from agent in real-time
-- [ ] Send user messages to agent
-- [ ] Persist all threads and messages to Supabase
-- [ ] Restore thread history on page reload
+- [x] Connect to multiple AG-UI agent endpoints defined in config
+- [x] Display agent sidebar showing all registered agents with status
+- [x] Show inbox list of all threads, ordered by last activity
+- [x] Create new thread with selected agent
+- [x] Stream messages from agent in real-time
+- [x] Send user messages to agent
+- [ ] Persist all threads and messages to Supabase (schema ready, needs Supabase connection)
+- [ ] Restore thread history on page reload (needs Supabase connection)
 
 ### User Experience
-- [ ] Show loading states during agent communication
-- [ ] Display agent typing/processing indicators
-- [ ] Handle agent errors gracefully with retry option
-- [ ] Auto-scroll to new messages
-- [ ] Optimistic message display while sending
+- [x] Show loading states during agent communication
+- [x] Display agent typing/processing indicators
+- [x] Handle agent errors gracefully with retry option
+- [x] Auto-scroll to new messages
+- [ ] Optimistic message display while sending (partially implemented)
 
 ### Technical Requirements
-- [ ] TypeScript throughout
-- [ ] Responsive layout (desktop-first, mobile-friendly)
-- [ ] Real-time updates via Supabase subscriptions
-- [ ] Proper error boundaries
+- [x] TypeScript throughout
+- [x] Responsive layout (desktop-first, mobile-friendly)
+- [ ] Real-time updates via Supabase subscriptions (needs Supabase connection)
+- [x] Proper error boundaries
 
 ## Success Metrics
 
