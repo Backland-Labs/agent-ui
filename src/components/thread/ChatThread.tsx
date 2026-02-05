@@ -23,7 +23,7 @@ export function ChatThread({ threadId, agent }: ChatThreadProps) {
 
   // Transform CopilotKit messages to our format
   // Messages have isTextMessage() method and role/content properties
-  const messages = visibleMessages
+  const messages = (visibleMessages ?? [])
     .filter((msg) => {
       // Check if it's a text message with user or assistant role
       if ("isTextMessage" in msg && typeof msg.isTextMessage === "function") {
