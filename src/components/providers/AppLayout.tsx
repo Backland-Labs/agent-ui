@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AgentSidebar } from "@/components/sidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -13,7 +14,9 @@ interface AppLayoutProps {
 export function AppLayout({ children, agents }: AppLayoutProps) {
   return (
     <SidebarProvider>
-      <AgentSidebar agents={agents} />
+      <Suspense>
+        <AgentSidebar agents={agents} />
+      </Suspense>
       <SidebarInset>
         <ErrorBoundary>{children}</ErrorBoundary>
       </SidebarInset>
