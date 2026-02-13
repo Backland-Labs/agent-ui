@@ -61,15 +61,19 @@ export function NewThreadDialog({ agents }: NewThreadDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="w-full">
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full border-primary/25 text-primary hover:bg-primary/10 hover:border-primary/40 transition-all"
+        >
           <Plus className="h-3.5 w-3.5" />
           New Thread
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[380px]">
+      <DialogContent className="sm:max-w-[380px] bg-card/90 backdrop-blur-xl border-border/40">
         <DialogHeader>
-          <DialogTitle className="text-sm font-medium">New conversation</DialogTitle>
-          <DialogDescription className="text-xs">
+          <DialogTitle className="font-serif italic text-base">New conversation</DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground/70">
             Choose an agent to start chatting with.
           </DialogDescription>
         </DialogHeader>
@@ -97,7 +101,7 @@ export function NewThreadDialog({ agents }: NewThreadDialogProps) {
             Cancel
           </Button>
           <Button size="sm" onClick={handleCreate} disabled={!selectedAgent || isCreating}>
-            {isCreating ? "Creating..." : "Start"}
+            {isCreating ? "Creating..." : "Begin"}
           </Button>
         </DialogFooter>
       </DialogContent>

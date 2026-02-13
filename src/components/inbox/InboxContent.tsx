@@ -46,14 +46,14 @@ export function InboxContent({ agents }: InboxContentProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-6 py-4 border-b">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border/40">
         <div>
-          <h2 className="text-sm font-medium">
+          <h2 className="font-serif italic text-base text-foreground/90">
             {agentFilter
               ? `${agents.find((a) => a.id === agentFilter)?.name || "Agent"}`
               : "All Threads"}
           </h2>
-          <p className="font-mono text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wider">
+          <p className="font-mono text-[10px] text-muted-foreground/50 mt-0.5 uppercase tracking-wider">
             {threads.length} conversation{threads.length !== 1 ? "s" : ""}
           </p>
         </div>

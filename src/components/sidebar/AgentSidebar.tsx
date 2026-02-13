@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Inbox, CircleDot } from "lucide-react";
+import { Inbox } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -18,23 +18,17 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { NewThreadDialog } from "./NewThreadDialog";
+import { cn } from "@/lib/utils";
 import type { AgentConfig, AgentStatus } from "@/lib/agents/types";
 
 interface AgentSidebarProps {
   agents: AgentConfig[];
 }
 
-const statusColorClass: Record<AgentStatus, string> = {
-  online: "text-green-500",
-  offline: "text-destructive",
-  unknown: "text-muted-foreground",
-};
-
 export function AgentSidebar({ agents }: AgentSidebarProps) {
   const pathname = usePathname();
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>({});
 
-  // Fetch health status for each agent on mount
   useEffect(() => {
     async function checkHealth() {
       const results = await Promise.allSettled(
@@ -61,10 +55,11 @@ export function AgentSidebar({ agents }: AgentSidebarProps) {
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <span className="font-mono text-xs font-semibold uppercase tracking-widest text-foreground">
-            Agent UI
+        <div className="flex items-center gap-2 px-2 py-2">
+          <span className="font-serif italic text-base tracking-tight text-foreground">
+            agent ui
           </span>
+          <div className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-breathe" />
         </div>
       </SidebarHeader>
 
@@ -85,7 +80,7 @@ export function AgentSidebar({ agents }: AgentSidebarProps) {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          <SidebarGroupLabel className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/60">
             Agents
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -101,7 +96,16 @@ export function AgentSidebar({ agents }: AgentSidebarProps) {
                       tooltip={agent.description}
                     >
                       <Link href={`/inbox?agent=${agent.id}`}>
-                        <CircleDot className={`h-3.5 w-3.5 ${statusColorClass[agentStatus]}`} />
+                        <div
+                          className={cn(
+                            "h-2 w-2 rounded-full shrink-0 transition-all duration-500",
+                            agentStatus === "online" &&
+                              "bg-emerald-400 shadow-[0_0_6px_1px] shadow-emerald-400/50",
+                            agentStatus === "offline" &&
+                              "bg-destructive/80 shadow-[0_0_6px_1px] shadow-destructive/30",
+                            agentStatus === "unknown" && "bg-muted-foreground/30"
+                          )}
+                        />
                         <span>{agent.name}</span>
                       </Link>
                     </SidebarMenuButton>
