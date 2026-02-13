@@ -41,7 +41,16 @@ export default async function ThreadPage({ params }: ThreadPageProps) {
       </header>
       <main className="flex-1 overflow-hidden">
         <Suspense fallback={<ThreadSkeleton />}>
-          <ThreadContent threadId={thread.id} agent={agent} />
+          <ThreadContent
+            threadId={thread.id}
+            agent={{
+              id: agent.id,
+              name: agent.name,
+              endpoint_url: agent.endpoint_url,
+              icon: agent.icon ?? undefined,
+              description: agent.description ?? undefined,
+            }}
+          />
         </Suspense>
       </main>
     </div>

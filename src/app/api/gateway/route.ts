@@ -5,6 +5,8 @@ import * as schema from "../../../../db/schema";
 
 type Db = typeof defaultDb;
 
+type GatewayErrorCode = "AGENT_UNREACHABLE" | "AGENT_TIMEOUT" | "AGENT_ERROR" | "INTERNAL_ERROR";
+
 interface GatewayRequestBody {
   threadId: string;
   agentId: string;
@@ -30,6 +32,70 @@ function parseSSEStream(text: string): SSEEvent[] {
     .split("\n\n")
     .filter((chunk) => chunk.startsWith("data: "))
     .map((chunk) => JSON.parse(chunk.replace("data: ", "")));
+}
+
+/** Standard SSE response headers, including X-Run-Id correlation. */
+function sseHeaders(runId: string): Record<string, string> {
+  return {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+    "X-Run-Id": runId,
+  };
+}
+
+/** Build a structured RUN_ERROR SSE event. */
+function buildRunError(
+  threadId: string,
+  runId: string,
+  code: GatewayErrorCode,
+  message: string
+): string {
+  return sseEvent({ type: "RUN_ERROR", threadId, runId, code, message });
+}
+
+/** Mark a run as failed in the database. */
+async function failRun(db: Db, runId: string, errorMessage: string): Promise<void> {
+  await db
+    .update(schema.runs)
+    .set({ status: "failed", error: errorMessage, finished_at: new Date() })
+    .where(eq(schema.runs.id, runId));
+}
+
+/** Mark a run as cancelled in the database. */
+async function cancelRun(db: Db, runId: string): Promise<void> {
+  await db
+    .update(schema.runs)
+    .set({ status: "cancelled", error: "Client disconnected", finished_at: new Date() })
+    .where(eq(schema.runs.id, runId));
+}
+
+/** Read the agent timeout from env (defaults to 120 000 ms). */
+function getTimeoutMs(): number {
+  const envVal = process.env.AGENT_TIMEOUT_MS;
+  if (envVal) {
+    const parsed = parseInt(envVal, 10);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return 120_000;
+}
+
+/**
+ * Determine the GatewayErrorCode from a caught error during agent fetch.
+ * - AbortError from our timeout controller  -> AGENT_TIMEOUT
+ * - AbortError from client disconnect       -> handled separately (cancelled)
+ * - Any other error (network, DNS, etc.)    -> AGENT_UNREACHABLE
+ */
+function classifyFetchError(
+  error: unknown,
+  isTimeout: boolean
+): { code: GatewayErrorCode; message: string } {
+  if (isTimeout) {
+    return { code: "AGENT_TIMEOUT", message: "Agent request timed out" };
+  }
+  const msg = error instanceof Error ? error.message : "Unknown error";
+  return { code: "AGENT_UNREACHABLE", message: msg };
 }
 
 /**
@@ -104,47 +170,79 @@ export async function handleGatewayPost(req: Request, db: Db): Promise<Response>
     content: m.content,
   }));
 
-  // 6. Call agent endpoint
+  // 6. Call agent endpoint with timeout and client disconnect handling
+  const timeoutMs = getTimeoutMs();
+  const timeoutController = new AbortController();
+  let timedOut = false;
+  let clientDisconnected = false;
+
+  // Set up timeout
+  const timeoutTimer = setTimeout(() => {
+    timedOut = true;
+    timeoutController.abort();
+  }, timeoutMs);
+
+  // Listen for client disconnect (req.signal)
+  const onClientAbort = () => {
+    clientDisconnected = true;
+    timeoutController.abort();
+  };
+  if (req.signal) {
+    // If the request is already aborted, handle immediately
+    if (req.signal.aborted) {
+      clientDisconnected = true;
+      timeoutController.abort();
+    } else {
+      req.signal.addEventListener("abort", onClientAbort);
+    }
+  }
+
   let agentResponse: Response;
   try {
     agentResponse = await fetch(agent.endpoint_url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Run-Id": runId,
+      },
       body: JSON.stringify({
         threadId,
         runId,
         messages: messagesForAgent,
       }),
+      signal: timeoutController.signal,
     });
   } catch (error: unknown) {
-    // Agent call failed - update run to failed status
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    await db
-      .update(schema.runs)
-      .set({
-        status: "failed",
-        error: errorMessage,
-        finished_at: new Date(),
-      })
-      .where(eq(schema.runs.id, runId));
+    clearTimeout(timeoutTimer);
+    if (req.signal) {
+      req.signal.removeEventListener("abort", onClientAbort);
+    }
 
-    // Return an SSE stream with the error event
-    const errorBody = sseEvent({
-      type: "RUN_ERROR",
-      threadId,
-      runId,
-      error: errorMessage,
-    });
+    // Client disconnected - mark run as cancelled
+    if (clientDisconnected) {
+      await cancelRun(db, runId);
+      const errorBody = buildRunError(threadId, runId, "AGENT_TIMEOUT", "Client disconnected");
+      return new Response(errorBody, { status: 200, headers: sseHeaders(runId) });
+    }
 
-    return new Response(errorBody, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        "X-Accel-Buffering": "no",
-      },
-    });
+    // Timeout or network error
+    const { code, message: errMsg } = classifyFetchError(error, timedOut);
+    await failRun(db, runId, errMsg);
+    const errorBody = buildRunError(threadId, runId, code, errMsg);
+    return new Response(errorBody, { status: 200, headers: sseHeaders(runId) });
+  }
+
+  clearTimeout(timeoutTimer);
+  if (req.signal) {
+    req.signal.removeEventListener("abort", onClientAbort);
+  }
+
+  // 6b. Handle non-200 responses from the agent
+  if (!agentResponse.ok) {
+    const errMsg = `Agent returned HTTP ${agentResponse.status}: ${agentResponse.statusText}`;
+    await failRun(db, runId, errMsg);
+    const errorBody = buildRunError(threadId, runId, "AGENT_ERROR", errMsg);
+    return new Response(errorBody, { status: 200, headers: sseHeaders(runId) });
   }
 
   // 7. Parse agent SSE response and process events
@@ -205,12 +303,7 @@ export async function handleGatewayPost(req: Request, db: Db): Promise<Response>
 
   return new Response(sseBody, {
     status: 200,
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no",
-    },
+    headers: sseHeaders(runId),
   });
 }
 

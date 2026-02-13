@@ -14,6 +14,10 @@ interface SSEEvent {
   messageId?: string;
   role?: string;
   delta?: string;
+  code?: string;
+  message?: string;
+  error?: string;
+  [key: string]: unknown;
 }
 
 type TestDb = ReturnType<typeof drizzle<typeof schema>>;
@@ -382,6 +386,187 @@ describe("POST /api/gateway", () => {
     expect(allRuns).toHaveLength(1);
     expect(allRuns[0].status).toBe("failed");
     expect(allRuns[0].error).toContain("Connection refused");
+  });
+
+  it("returns AGENT_UNREACHABLE error code on network failure", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("Connection refused"));
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId, agentId, message: "go" }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    const body = await readSSEBody(res);
+    const events = parseSSEEvents(body);
+
+    const errorEvent = events.find((e) => e.type === "RUN_ERROR");
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent!.code).toBe("AGENT_UNREACHABLE");
+    expect(errorEvent!.message).toContain("Connection refused");
+    expect(errorEvent!.threadId).toBeDefined();
+    expect(errorEvent!.runId).toBeDefined();
+  });
+
+  it("returns AGENT_ERROR when agent returns non-200 status", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("Internal Server Error", { status: 500, statusText: "Internal Server Error" })
+    );
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId, agentId, message: "go" }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    const body = await readSSEBody(res);
+    const events = parseSSEEvents(body);
+
+    const errorEvent = events.find((e) => e.type === "RUN_ERROR");
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent!.code).toBe("AGENT_ERROR");
+    expect(errorEvent!.message).toContain("500");
+
+    // Run should be marked failed in DB
+    const allRuns = await db.select().from(schema.runs);
+    expect(allRuns).toHaveLength(1);
+    expect(allRuns[0].status).toBe("failed");
+  });
+
+  it("times out and returns AGENT_TIMEOUT error after configured timeout", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    // Set a very short timeout for testing
+    vi.stubEnv("AGENT_TIMEOUT_MS", "50");
+
+    // Mock fetch to hang until its signal aborts (simulates a slow agent)
+    vi.spyOn(globalThis, "fetch").mockImplementationOnce(
+      (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal = init?.signal;
+          if (signal) {
+            signal.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          }
+        })
+    );
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId, agentId, message: "go" }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    const body = await readSSEBody(res);
+    const events = parseSSEEvents(body);
+
+    const errorEvent = events.find((e) => e.type === "RUN_ERROR");
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent!.code).toBe("AGENT_TIMEOUT");
+    expect(errorEvent!.message).toContain("timed out");
+
+    // Run should be marked failed in DB
+    const allRuns = await db.select().from(schema.runs);
+    expect(allRuns).toHaveLength(1);
+    expect(allRuns[0].status).toBe("failed");
+    expect(allRuns[0].error).toContain("timed out");
+
+    vi.unstubAllEnvs();
+  });
+
+  it("sends X-Run-Id header to agent endpoint", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    let capturedHeaders: HeadersInit | undefined;
+    vi.spyOn(globalThis, "fetch").mockImplementationOnce(async (_url, init) => {
+      capturedHeaders = init?.headers;
+      const body = JSON.parse(init?.body as string);
+      return buildMockAgentSSEResponse(threadId, body.runId, "response");
+    });
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId, agentId, message: "hello" }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    await readSSEBody(res);
+
+    // The fetch call to the agent should include X-Run-Id header
+    expect(capturedHeaders).toBeDefined();
+    const headers = new Headers(capturedHeaders);
+    expect(headers.get("X-Run-Id")).toBeTruthy();
+  });
+
+  it("includes X-Run-Id in response headers", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      buildMockAgentSSEResponse(threadId, "any-run-id", "Hi!")
+    );
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId, agentId, message: "hello" }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    await readSSEBody(res);
+
+    // Response should include X-Run-Id header
+    const runIdHeader = res.headers.get("X-Run-Id");
+    expect(runIdHeader).toBeTruthy();
+    // It should be a valid UUID
+    expect(runIdHeader).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  });
+
+  it("sets run status to cancelled when client disconnects", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    // Create an AbortController to simulate client disconnect
+    const clientAbort = new AbortController();
+
+    // Mock fetch to hang until aborted, then reject with abort error
+    vi.spyOn(globalThis, "fetch").mockImplementationOnce(
+      (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          // Listen for the abort signal from the gateway (which should propagate client abort)
+          const signal = init?.signal;
+          if (signal) {
+            signal.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          }
+        })
+    );
+
+    // Abort the client request after a short delay
+    setTimeout(() => clientAbort.abort(), 50);
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId, agentId, message: "go" }),
+      signal: clientAbort.signal,
+    });
+
+    const res = await handleGatewayPost(req, db);
+    await readSSEBody(res);
+
+    // Run should be marked cancelled in DB
+    const allRuns = await db.select().from(schema.runs);
+    expect(allRuns).toHaveLength(1);
+    expect(allRuns[0].status).toBe("cancelled");
   });
 
   it("updates thread last_activity_at after the run", async () => {

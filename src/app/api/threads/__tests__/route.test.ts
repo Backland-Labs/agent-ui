@@ -14,7 +14,7 @@ async function createTestDb(): Promise<TestDb> {
   return db;
 }
 
-async function seedAgent(db: TestDb, overrides: Partial<schema.Agent> = {}) {
+async function seedAgent(db: TestDb, overrides: Partial<typeof schema.agents.$inferInsert> = {}) {
   const agent = {
     id: "mock-assistant",
     name: "Mock Assistant",
@@ -30,7 +30,11 @@ async function seedAgent(db: TestDb, overrides: Partial<schema.Agent> = {}) {
   return agent;
 }
 
-async function seedThread(db: TestDb, agentId: string, overrides: Partial<schema.Thread> = {}) {
+async function seedThread(
+  db: TestDb,
+  agentId: string,
+  overrides: Partial<typeof schema.threads.$inferInsert> = {}
+) {
   const thread = {
     id: crypto.randomUUID(),
     agent_id: agentId,
@@ -45,7 +49,11 @@ async function seedThread(db: TestDb, agentId: string, overrides: Partial<schema
   return thread;
 }
 
-async function seedMessage(db: TestDb, threadId: string, overrides: Partial<schema.Message> = {}) {
+async function seedMessage(
+  db: TestDb,
+  threadId: string,
+  overrides: Partial<typeof schema.messages.$inferInsert> = {}
+) {
   const message = {
     id: crypto.randomUUID(),
     thread_id: threadId,
