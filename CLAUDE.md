@@ -18,6 +18,16 @@ bunx playwright test tests/app.spec.ts   # Run a specific test file
 bunx playwright test -g "test name"      # Run test by name
 bunx playwright test --headed            # Run with visible browser
 
+# Tests (unit)
+bun run test              # Run unit tests
+bun run test:watch        # Run in watch mode
+bun run test:coverage     # Run with coverage report
+
+# Formatting & type-checking
+bun run format            # Format all files
+bun run format:check      # Check formatting (CI)
+bun run typecheck         # Type-check without emitting
+
 # Supabase (local)
 npx supabase start   # Start local Supabase (serves at localhost:54321)
 ```
