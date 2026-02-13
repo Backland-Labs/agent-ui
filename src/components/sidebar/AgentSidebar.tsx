@@ -18,6 +18,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { NewThreadDialog } from "./NewThreadDialog";
+import { CalendarWidget } from "./CalendarWidget";
 import { cn } from "@/lib/utils";
 import type { AgentConfig, AgentStatus } from "@/lib/agents/types";
 
@@ -116,6 +117,8 @@ export function AgentSidebar({ agents }: AgentSidebarProps) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <CalendarWidget />
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">
