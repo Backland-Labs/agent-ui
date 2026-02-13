@@ -68,9 +68,7 @@ export function NewThreadDialog({ agents }: NewThreadDialogProps) {
                   <div>
                     <div className="text-sm">{agent.name}</div>
                     {agent.description && (
-                      <div className="text-xs text-muted-foreground">
-                        {agent.description}
-                      </div>
+                      <div className="text-xs text-muted-foreground">{agent.description}</div>
                     )}
                   </div>
                 </SelectItem>

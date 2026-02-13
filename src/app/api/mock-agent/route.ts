@@ -48,8 +48,7 @@ export async function POST(req: NextRequest) {
   const { threadId, runId, messages } = input;
 
   // Get the last user message
-  const lastUserMessage =
-    messages.filter((m) => m.role === "user").pop()?.content || "Hello";
+  const lastUserMessage = messages.filter((m) => m.role === "user").pop()?.content || "Hello";
 
   // Generate mock response
   const responseText = getMockResponse(lastUserMessage);

@@ -49,12 +49,7 @@ export function MessageList({ messages, agentIcon, isLoading }: MessageListProps
           />
         ))}
         {isLoading && (
-          <MessageBubble
-            role="assistant"
-            content=""
-            agentIcon={agentIcon}
-            isStreaming
-          />
+          <MessageBubble role="assistant" content="" agentIcon={agentIcon} isStreaming />
         )}
         <div ref={bottomRef} />
       </div>

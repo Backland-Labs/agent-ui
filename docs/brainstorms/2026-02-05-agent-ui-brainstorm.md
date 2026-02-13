@@ -16,18 +16,21 @@ A flexible, extensible web UI for managing multiple AI agents. Think "Claude Cow
 ## Why This Approach
 
 ### AG-UI Protocol
+
 - Industry standard (Google, Microsoft, Anthropic, LangChain all support it)
 - Event-based streaming handles long-running agent tasks naturally
 - Built-in support for human-in-the-loop patterns
 - Framework-agnostic—works with any agent that speaks the protocol
 
 ### UI-Owned Persistence (Supabase)
+
 - Unified view across all agents
 - History survives agent restarts
 - Enables search, filtering, thread management
 - Agents stay stateless/simple
 
 ### CopilotKit Open Source
+
 - Battle-tested AG-UI React client
 - Handles protocol complexity (17 event types, streaming, reconnection)
 - MIT licensed, no paid dependencies needed
@@ -35,14 +38,14 @@ A flexible, extensible web UI for managing multiple AI agents. Think "Claude Cow
 
 ## Key Decisions
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Protocol | AG-UI | Industry standard, framework-agnostic |
-| Agent integration | Config file (JSON) | Simple, declarative, easy to add new agents |
-| Platform | Web (React/Next.js) | CopilotKit has first-party React support |
-| AG-UI client | CopilotKit (open source) | Don't reinvent protocol handling |
-| Persistence | Supabase (UI-owned) | Unified inbox, resilient to agent restarts |
-| Initial agents | Claude SDK, OpenCode SDK | Your primary use cases |
+| Decision          | Choice                   | Rationale                                   |
+| ----------------- | ------------------------ | ------------------------------------------- |
+| Protocol          | AG-UI                    | Industry standard, framework-agnostic       |
+| Agent integration | Config file (JSON)       | Simple, declarative, easy to add new agents |
+| Platform          | Web (React/Next.js)      | CopilotKit has first-party React support    |
+| AG-UI client      | CopilotKit (open source) | Don't reinvent protocol handling            |
+| Persistence       | Supabase (UI-owned)      | Unified inbox, resilient to agent restarts  |
+| Initial agents    | Claude SDK, OpenCode SDK | Your primary use cases                      |
 
 ## Architecture Overview
 
@@ -80,6 +83,7 @@ A flexible, extensible web UI for managing multiple AI agents. Think "Claude Cow
 ## Data Model (Supabase)
 
 ### `agents` table
+
 - `id` (uuid, pk)
 - `name` (text)
 - `endpoint_url` (text) - AG-UI endpoint
@@ -89,6 +93,7 @@ A flexible, extensible web UI for managing multiple AI agents. Think "Claude Cow
 - `created_at`, `updated_at`
 
 ### `threads` table
+
 - `id` (uuid, pk)
 - `agent_id` (uuid, fk)
 - `title` (text) - auto-generated or user-set
@@ -97,6 +102,7 @@ A flexible, extensible web UI for managing multiple AI agents. Think "Claude Cow
 - `created_at`, `updated_at`
 
 ### `messages` table
+
 - `id` (uuid, pk)
 - `thread_id` (uuid, fk)
 - `role` (enum: user, assistant, system, tool)

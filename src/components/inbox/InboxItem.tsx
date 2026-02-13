@@ -44,12 +44,8 @@ export function InboxItem({ thread, isActive }: InboxItemProps) {
               {timeAgo}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {thread.agent_name}
-          </p>
-          <p className="text-xs text-muted-foreground/70 mt-1 line-clamp-1">
-            {truncatedMessage}
-          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">{thread.agent_name}</p>
+          <p className="text-xs text-muted-foreground/70 mt-1 line-clamp-1">{truncatedMessage}</p>
         </div>
       </div>
     </Link>

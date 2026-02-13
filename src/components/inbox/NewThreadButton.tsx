@@ -19,15 +19,9 @@ interface NewThreadButtonProps {
   defaultAgentId?: string;
 }
 
-export function NewThreadButton({
-  agents,
-  onCreateThread,
-  defaultAgentId,
-}: NewThreadButtonProps) {
+export function NewThreadButton({ agents, onCreateThread, defaultAgentId }: NewThreadButtonProps) {
   const router = useRouter();
-  const [selectedAgent, setSelectedAgent] = useState(
-    defaultAgentId || agents[0]?.id || ""
-  );
+  const [selectedAgent, setSelectedAgent] = useState(defaultAgentId || agents[0]?.id || "");
   const [isCreating, setIsCreating] = useState(false);
 
   const handleCreate = async () => {

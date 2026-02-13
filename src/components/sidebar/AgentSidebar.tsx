@@ -30,7 +30,9 @@ export function AgentSidebar({ agents }: AgentSidebarProps) {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <span className="font-mono text-xs font-semibold uppercase tracking-widest text-foreground">Agent UI</span>
+          <span className="font-mono text-xs font-semibold uppercase tracking-widest text-foreground">
+            Agent UI
+          </span>
         </div>
       </SidebarHeader>
 
@@ -51,7 +53,9 @@ export function AgentSidebar({ agents }: AgentSidebarProps) {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Agents</SidebarGroupLabel>
+          <SidebarGroupLabel className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            Agents
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {agents.map((agent) => (

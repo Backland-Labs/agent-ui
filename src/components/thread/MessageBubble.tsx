@@ -10,26 +10,15 @@ interface MessageBubbleProps {
   isStreaming?: boolean;
 }
 
-export function MessageBubble({
-  role,
-  content,
-  isStreaming,
-}: MessageBubbleProps) {
+export function MessageBubble({ role, content, isStreaming }: MessageBubbleProps) {
   const isUser = role === "user";
 
   return (
-    <div
-      className={cn(
-        "flex gap-3 px-6 py-3",
-        isUser ? "flex-row-reverse" : "flex-row"
-      )}
-    >
+    <div className={cn("flex gap-3 px-6 py-3", isUser ? "flex-row-reverse" : "flex-row")}>
       <div
         className={cn(
           "h-7 w-7 rounded-md flex items-center justify-center shrink-0",
-          isUser
-            ? "bg-foreground text-background"
-            : "bg-accent text-muted-foreground"
+          isUser ? "bg-foreground text-background" : "bg-accent text-muted-foreground"
         )}
       >
         {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
@@ -37,9 +26,7 @@ export function MessageBubble({
       <div
         className={cn(
           "rounded-lg px-3.5 py-2.5 max-w-[75%] text-[13px] leading-relaxed",
-          isUser
-            ? "bg-foreground text-background"
-            : "bg-accent text-foreground"
+          isUser ? "bg-foreground text-background" : "bg-accent text-foreground"
         )}
       >
         <div className="whitespace-pre-wrap break-words">

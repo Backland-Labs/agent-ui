@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Message, MessageInsert } from "@/types/database.types";
+import type { Message } from "@/types/database.types";
 
 export function useMessages(threadId: string) {
   const [messages, setMessages] = useState<Message[]>([]);

@@ -12,12 +12,7 @@ interface ChatThreadProps {
 }
 
 export function ChatThread({ threadId, agent }: ChatThreadProps) {
-  const {
-    visibleMessages,
-    appendMessage,
-    stopGeneration,
-    isLoading,
-  } = useCopilotChat({
+  const { visibleMessages, appendMessage, stopGeneration, isLoading } = useCopilotChat({
     id: threadId,
   });
 
@@ -27,14 +22,15 @@ export function ChatThread({ threadId, agent }: ChatThreadProps) {
     .filter((msg) => {
       // Check if it's a text message with user or assistant role
       if ("isTextMessage" in msg && typeof msg.isTextMessage === "function") {
-        return msg.isTextMessage() &&
-          ("role" in msg && (msg.role === "user" || msg.role === "assistant"));
+        return (
+          msg.isTextMessage() && "role" in msg && (msg.role === "user" || msg.role === "assistant")
+        );
       }
       return false;
     })
     .map((msg) => ({
       id: msg.id,
-      role: ("role" in msg && msg.role === "user") ? "user" as const : "assistant" as const,
+      role: "role" in msg && msg.role === "user" ? ("user" as const) : ("assistant" as const),
       content: "content" in msg ? String(msg.content || "") : "",
     }));
 
@@ -48,11 +44,7 @@ export function ChatThread({ threadId, agent }: ChatThreadProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <MessageList
-        messages={messages}
-        agentIcon={agent.icon}
-        isLoading={isLoading}
-      />
+      <MessageList messages={messages} agentIcon={agent.icon} isLoading={isLoading} />
       <ChatInput
         onSend={handleSend}
         onStop={handleStop}

@@ -15,6 +15,7 @@ Build a flexible, extensible web UI for managing multiple AI agents. A unified i
 ## Problem Statement / Motivation
 
 Currently, there's no open, flexible UI for managing multiple AI agents from different sources. Users who want to:
+
 - Run agents built with Claude SDK, OpenCode SDK, or other frameworks
 - Have a unified view across all their agents
 - Maintain conversation history that survives agent restarts
@@ -96,15 +97,13 @@ const agentsConfig = loadAgentsConfig();
 
 const runtime = new CopilotRuntime({
   agents: Object.fromEntries(
-    agentsConfig.map(agent => [
-      agent.id,
-      new HttpAgent({ url: agent.endpoint_url })
-    ])
-  )
+    agentsConfig.map((agent) => [agent.id, new HttpAgent({ url: agent.endpoint_url })])
+  ),
 });
 ```
 
 **Key packages:**
+
 - `@copilotkit/react-core` - hooks (useCopilotChat)
 - `@copilotkit/runtime` - backend runtime
 - `@ag-ui/client` - HttpAgent for external endpoints
@@ -256,6 +255,7 @@ agent-ui/
 ## Acceptance Criteria
 
 ### Core Functionality
+
 - [x] Connect to multiple AG-UI agent endpoints defined in config
 - [x] Display agent sidebar showing all registered agents with status
 - [x] Show inbox list of all threads, ordered by last activity
@@ -266,6 +266,7 @@ agent-ui/
 - [ ] Restore thread history on page reload (needs Supabase connection)
 
 ### User Experience
+
 - [x] Show loading states during agent communication
 - [x] Display agent typing/processing indicators
 - [x] Handle agent errors gracefully with retry option
@@ -273,6 +274,7 @@ agent-ui/
 - [ ] Optimistic message display while sending (partially implemented)
 
 ### Technical Requirements
+
 - [x] TypeScript throughout
 - [x] Responsive layout (desktop-first, mobile-friendly)
 - [ ] Real-time updates via Supabase subscriptions (needs Supabase connection)
@@ -288,37 +290,43 @@ agent-ui/
 ## Dependencies & Risks
 
 ### Dependencies
+
 - **CopilotKit** - AG-UI client implementation (MIT, well-maintained)
 - **Supabase** - Persistence layer (requires account setup)
 - **External agents** - Need AG-UI compliant agents to test against
 
 ### Risks
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| CopilotKit API changes | High | Pin versions, monitor releases |
+
+| Risk                       | Impact | Mitigation                           |
+| -------------------------- | ------ | ------------------------------------ |
+| CopilotKit API changes     | High   | Pin versions, monitor releases       |
 | Agent endpoint unavailable | Medium | Graceful error handling, retry logic |
-| Supabase rate limits | Low | Batch writes, connection pooling |
+| Supabase rate limits       | Low    | Batch writes, connection pooling     |
 
 ## Implementation Phases
 
 ### Phase 1: Foundation
+
 - Next.js project setup with TypeScript
 - Supabase project and schema setup
 - Basic layout (sidebar, main content area)
 - Agent config loading
 
 ### Phase 2: CopilotKit Integration
+
 - CopilotKit runtime with HttpAgent
 - Single agent connection test
 - Basic chat interface (hardcoded agent)
 
 ### Phase 3: Multi-Agent & Persistence
+
 - Multiple agent registration
 - Thread CRUD operations
 - Message persistence
 - Inbox view
 
 ### Phase 4: Polish
+
 - Real-time subscriptions
 - Error handling
 - Loading states
@@ -327,9 +335,11 @@ agent-ui/
 ## References & Research
 
 ### Internal
+
 - Brainstorm: `docs/brainstorms/2026-02-05-agent-ui-brainstorm.md`
 
 ### External
+
 - [AG-UI Protocol Docs](https://docs.ag-ui.com)
 - [CopilotKit Documentation](https://docs.copilotkit.ai)
 - [Supabase Next.js Guide](https://supabase.com/docs/guides/getting-started/quickstarts/nextjs)
@@ -338,20 +348,26 @@ agent-ui/
 ### Code Patterns
 
 **CopilotKit with external agents:**
+
 ```typescript
 import { HttpAgent } from "@ag-ui/client";
 const agent = new HttpAgent({ url: "http://agent-endpoint/agui" });
 ```
 
 **Supabase real-time subscription:**
+
 ```typescript
 supabase
   .channel(`thread:${threadId}`)
-  .on('postgres_changes', {
-    event: 'INSERT',
-    schema: 'public',
-    table: 'messages',
-    filter: `thread_id=eq.${threadId}`
-  }, handleNewMessage)
-  .subscribe()
+  .on(
+    "postgres_changes",
+    {
+      event: "INSERT",
+      schema: "public",
+      table: "messages",
+      filter: `thread_id=eq.${threadId}`,
+    },
+    handleNewMessage
+  )
+  .subscribe();
 ```

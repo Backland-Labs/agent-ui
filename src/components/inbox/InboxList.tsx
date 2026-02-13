@@ -40,9 +40,7 @@ export function InboxList({ threads, loading, activeThreadId }: InboxListProps) 
         <Inbox className="h-6 w-6 text-muted-foreground/30 mb-3" />
         <h3 className="text-sm font-medium">No conversations</h3>
         <p className="text-xs text-muted-foreground mt-1">
-          {agentFilter
-            ? "Start a new conversation with this agent"
-            : "Select an agent to begin"}
+          {agentFilter ? "Start a new conversation with this agent" : "Select an agent to begin"}
         </p>
       </div>
     );
@@ -52,11 +50,7 @@ export function InboxList({ threads, loading, activeThreadId }: InboxListProps) 
     <ScrollArea className="h-full">
       <div className="divide-y">
         {threads.map((thread) => (
-          <InboxItem
-            key={thread.id}
-            thread={thread}
-            isActive={thread.id === activeThreadId}
-          />
+          <InboxItem key={thread.id} thread={thread} isActive={thread.id === activeThreadId} />
         ))}
       </div>
     </ScrollArea>
