@@ -285,13 +285,17 @@ describe("POST /api/gateway", () => {
     const body = await readSSEBody(res);
     const events = parseSSEEvents(body);
 
-    // Should contain the expected AG-UI event types
+    // Should contain the expected AG-UI event types (USER_MESSAGE_CREATED is injected by gateway)
     const eventTypes = events.map((e) => e.type);
+    expect(eventTypes).toContain("USER_MESSAGE_CREATED");
     expect(eventTypes).toContain("RUN_STARTED");
     expect(eventTypes).toContain("TEXT_MESSAGE_START");
     expect(eventTypes).toContain("TEXT_MESSAGE_CONTENT");
     expect(eventTypes).toContain("TEXT_MESSAGE_END");
     expect(eventTypes).toContain("RUN_FINISHED");
+
+    // USER_MESSAGE_CREATED should be the first event
+    expect(events[0].type).toBe("USER_MESSAGE_CREATED");
 
     // Check text content was forwarded
     const text = extractTextContent(events);
@@ -567,6 +571,38 @@ describe("POST /api/gateway", () => {
     const allRuns = await db.select().from(schema.runs);
     expect(allRuns).toHaveLength(1);
     expect(allRuns[0].status).toBe("cancelled");
+  });
+
+  it("emits USER_MESSAGE_CREATED with the persisted message ID", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      buildMockAgentSSEResponse(threadId, "run-1", "reply")
+    );
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId, agentId, message: "hello" }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    const body = await readSSEBody(res);
+    const events = parseSSEEvents(body);
+
+    const userCreated = events.find((e) => e.type === "USER_MESSAGE_CREATED");
+    expect(userCreated).toBeDefined();
+    expect(userCreated!.threadId).toBe(threadId);
+    expect(userCreated!.messageId).toBeTruthy();
+
+    // The messageId should match the persisted user message
+    const dbMessages = await db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.thread_id, threadId));
+    const userMsg = dbMessages.find((m) => m.role === "user");
+    expect(userMsg).toBeDefined();
+    expect(userCreated!.messageId).toBe(userMsg!.id);
   });
 
   it("updates thread last_activity_at after the run", async () => {

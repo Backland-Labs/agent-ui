@@ -27,13 +27,6 @@ function sseEvent(data: object): string {
   return `data: ${JSON.stringify(data)}\n\n`;
 }
 
-function parseSSEStream(text: string): SSEEvent[] {
-  return text
-    .split("\n\n")
-    .filter((chunk) => chunk.startsWith("data: "))
-    .map((chunk) => JSON.parse(chunk.replace("data: ", "")));
-}
-
 /** Standard SSE response headers, including X-Run-Id correlation. */
 function sseHeaders(runId: string): Record<string, string> {
   return {
@@ -98,6 +91,70 @@ function classifyFetchError(
   return { code: "AGENT_UNREACHABLE", message: msg };
 }
 
+/** Parse a single SSE line (after "data: " prefix) into an event object. */
+function parseSSELine(line: string): SSEEvent | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("data: ")) return null;
+  try {
+    return JSON.parse(trimmed.slice(6));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Process an SSE event for persistence. Updates run status and accumulates
+ * assistant message content. Returns nothing -- side effects only.
+ */
+async function persistEvent(
+  event: SSEEvent,
+  db: Db,
+  runId: string,
+  threadId: string,
+  state: { assistantContent: string; assistantMessageId: string | null }
+): Promise<void> {
+  switch (event.type) {
+    case "RUN_STARTED":
+      await db
+        .update(schema.runs)
+        .set({ status: "running", started_at: new Date() })
+        .where(eq(schema.runs.id, runId));
+      break;
+
+    case "TEXT_MESSAGE_START":
+      state.assistantMessageId = (event.messageId as string) || null;
+      break;
+
+    case "TEXT_MESSAGE_CONTENT":
+      state.assistantContent += event.delta || "";
+      break;
+
+    case "TEXT_MESSAGE_END":
+      if (state.assistantContent) {
+        await db.insert(schema.messages).values({
+          id: state.assistantMessageId || crypto.randomUUID(),
+          thread_id: threadId,
+          run_id: runId,
+          role: "assistant",
+          content: state.assistantContent,
+          created_at: new Date(),
+        });
+      }
+      break;
+
+    case "RUN_FINISHED":
+      await db
+        .update(schema.runs)
+        .set({ status: "completed", finished_at: new Date() })
+        .where(eq(schema.runs.id, runId));
+      await db
+        .update(schema.threads)
+        .set({ last_activity_at: new Date(), updated_at: new Date() })
+        .where(eq(schema.threads.id, threadId));
+      break;
+  }
+}
+
 /**
  * Core gateway handler. Accepts a db instance for testability.
  *
@@ -109,9 +166,7 @@ function classifyFetchError(
  * 3. Insert user message into messages table
  * 4. Create run record (status: pending)
  * 5. Call agent endpoint with { threadId, runId, messages: [full history] }
- * 6. Parse SSE events from agent response
- * 7. For each event, update DB and forward to client
- * 8. Return SSE stream to client
+ * 6. Stream SSE events from agent through to client, persisting as they arrive
  */
 export async function handleGatewayPost(req: Request, db: Db): Promise<Response> {
   // 1. Validate input
@@ -176,19 +231,16 @@ export async function handleGatewayPost(req: Request, db: Db): Promise<Response>
   let timedOut = false;
   let clientDisconnected = false;
 
-  // Set up timeout
   const timeoutTimer = setTimeout(() => {
     timedOut = true;
     timeoutController.abort();
   }, timeoutMs);
 
-  // Listen for client disconnect (req.signal)
   const onClientAbort = () => {
     clientDisconnected = true;
     timeoutController.abort();
   };
   if (req.signal) {
-    // If the request is already aborted, handle immediately
     if (req.signal.aborted) {
       clientDisconnected = true;
       timeoutController.abort();
@@ -218,14 +270,12 @@ export async function handleGatewayPost(req: Request, db: Db): Promise<Response>
       req.signal.removeEventListener("abort", onClientAbort);
     }
 
-    // Client disconnected - mark run as cancelled
     if (clientDisconnected) {
       await cancelRun(db, runId);
       const errorBody = buildRunError(threadId, runId, "AGENT_TIMEOUT", "Client disconnected");
       return new Response(errorBody, { status: 200, headers: sseHeaders(runId) });
     }
 
-    // Timeout or network error
     const { code, message: errMsg } = classifyFetchError(error, timedOut);
     await failRun(db, runId, errMsg);
     const errorBody = buildRunError(threadId, runId, code, errMsg);
@@ -245,70 +295,86 @@ export async function handleGatewayPost(req: Request, db: Db): Promise<Response>
     return new Response(errorBody, { status: 200, headers: sseHeaders(runId) });
   }
 
-  // 7. Parse agent SSE response and process events
-  const agentBody = await agentResponse.text();
-  const events = parseSSEStream(agentBody);
+  // 7. Stream SSE events from agent through to client, persisting as they arrive.
+  //    First emit USER_MESSAGE_CREATED so the client can resolve the temp ID.
+  const encoder = new TextEncoder();
+  const userCreatedEvent = sseEvent({
+    type: "USER_MESSAGE_CREATED",
+    threadId,
+    messageId: userMessageId,
+  });
 
-  let assistantContent = "";
-  let assistantMessageId: string | null = null;
+  const agentBody = agentResponse.body;
 
-  for (const event of events) {
-    switch (event.type) {
-      case "RUN_STARTED":
-        await db
-          .update(schema.runs)
-          .set({ status: "running", started_at: new Date() })
-          .where(eq(schema.runs.id, runId));
-        break;
-
-      case "TEXT_MESSAGE_START":
-        assistantMessageId = (event.messageId as string) || null;
-        break;
-
-      case "TEXT_MESSAGE_CONTENT":
-        assistantContent += event.delta || "";
-        break;
-
-      case "TEXT_MESSAGE_END":
-        // Persist assistant message
-        if (assistantContent) {
-          await db.insert(schema.messages).values({
-            id: assistantMessageId || crypto.randomUUID(),
-            thread_id: threadId,
-            run_id: runId,
-            role: "assistant",
-            content: assistantContent,
-            created_at: new Date(),
-          });
-        }
-        break;
-
-      case "RUN_FINISHED":
-        await db
-          .update(schema.runs)
-          .set({ status: "completed", finished_at: new Date() })
-          .where(eq(schema.runs.id, runId));
-        break;
-    }
+  // If the agent returned no body, close out gracefully
+  if (!agentBody) {
+    await failRun(db, runId, "Agent returned empty response body");
+    const errorBody =
+      userCreatedEvent + buildRunError(threadId, runId, "AGENT_ERROR", "Empty response from agent");
+    return new Response(errorBody, { status: 200, headers: sseHeaders(runId) });
   }
 
-  // 8. Update thread last_activity_at
-  await db
-    .update(schema.threads)
-    .set({ last_activity_at: new Date(), updated_at: new Date() })
-    .where(eq(schema.threads.id, threadId));
+  const state = { assistantContent: "", assistantMessageId: null as string | null };
 
-  // 9. Forward all events to the client as SSE
-  const sseBody = events.map((e) => sseEvent(e)).join("");
+  const stream = new ReadableStream({
+    async start(controller) {
+      // Emit USER_MESSAGE_CREATED before any agent events
+      controller.enqueue(encoder.encode(userCreatedEvent));
 
-  return new Response(sseBody, {
+      const reader = agentBody.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          // Forward raw chunk to client immediately for streaming UX
+          controller.enqueue(value);
+
+          // Parse events from the chunk for persistence
+          buffer += chunk;
+          const segments = buffer.split("\n\n");
+          // Keep the last segment as it may be incomplete
+          buffer = segments.pop() || "";
+
+          for (const segment of segments) {
+            const event = parseSSELine(segment);
+            if (event) {
+              await persistEvent(event, db, runId, threadId, state);
+            }
+          }
+        }
+
+        // Process any remaining buffer
+        if (buffer.trim()) {
+          const event = parseSSELine(buffer);
+          if (event) {
+            await persistEvent(event, db, runId, threadId, state);
+          }
+        }
+      } catch {
+        // Stream read error -- mark run failed if not already completed
+        await failRun(db, runId, "Stream interrupted");
+        controller.enqueue(
+          encoder.encode(buildRunError(threadId, runId, "INTERNAL_ERROR", "Stream interrupted"))
+        );
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
     status: 200,
     headers: sseHeaders(runId),
   });
 }
 
 /**
- * Next.js route handler — uses the default database from db/client.ts.
+ * Next.js route handler -- uses the default database from db/client.ts.
  */
 export async function POST(req: NextRequest) {
   return handleGatewayPost(req, defaultDb);

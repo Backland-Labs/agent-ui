@@ -101,7 +101,7 @@ export function NewThreadDialog({ agents }: NewThreadDialogProps) {
             Cancel
           </Button>
           <Button size="sm" onClick={handleCreate} disabled={!selectedAgent || isCreating}>
-            {isCreating ? "Creating..." : "Begin"}
+            {isCreating ? "Creating..." : "Start"}
           </Button>
         </DialogFooter>
       </DialogContent>

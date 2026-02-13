@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Inbox } from "lucide-react";
 import {
   Sidebar,
@@ -27,6 +27,7 @@ interface AgentSidebarProps {
 
 export function AgentSidebar({ agents }: AgentSidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>({});
 
   useEffect(() => {
@@ -92,7 +93,7 @@ export function AgentSidebar({ agents }: AgentSidebarProps) {
                   <SidebarMenuItem key={agent.id}>
                     <SidebarMenuButton
                       asChild
-                      isActive={pathname === `/inbox?agent=${agent.id}`}
+                      isActive={pathname === "/inbox" && searchParams.get("agent") === agent.id}
                       tooltip={agent.description}
                     >
                       <Link href={`/inbox?agent=${agent.id}`}>
