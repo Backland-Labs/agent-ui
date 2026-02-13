@@ -125,7 +125,7 @@ describe("GET /api/agents/:id/health", () => {
     const seenAt = new Date("2026-02-10T12:34:56.000Z");
     const agent = await seedAgent(db, {
       status: "unknown",
-      last_seen_at: seenAt,
+      last_seen_at: seenAt.getTime(),
     });
 
     fetchSpy.mockRejectedValueOnce(new Error("down"));
