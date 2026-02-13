@@ -109,6 +109,35 @@ describe("GET /api/agents/:id/health", () => {
     expect(updated!.last_seen_at).toBeGreaterThan(0);
   });
 
+  it("returns null lastSeenAt when agent was previously never seen", async () => {
+    const agent = await seedAgent(db, { status: "unknown", last_seen_at: null });
+    fetchSpy.mockRejectedValueOnce(new Error("down"));
+
+    const response = await handleHealthCheck(agent.id, db);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("offline");
+    expect(data.lastSeenAt).toBeNull();
+  });
+
+  it("returns existing lastSeenAt when agent was seen before but offline", async () => {
+    const seenAt = new Date("2026-02-10T12:34:56.000Z");
+    const agent = await seedAgent(db, {
+      status: "unknown",
+      last_seen_at: seenAt,
+    });
+
+    fetchSpy.mockRejectedValueOnce(new Error("down"));
+
+    const response = await handleHealthCheck(agent.id, db);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("offline");
+    expect(data.lastSeenAt).toBe(seenAt.toISOString());
+  });
+
   it("preserves existing agent data when updating status", async () => {
     const agent = await seedAgent(db, {
       name: "My Custom Agent",

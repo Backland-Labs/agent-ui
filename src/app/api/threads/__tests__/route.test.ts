@@ -177,6 +177,19 @@ describe("POST /api/threads", () => {
     expect(data).toHaveProperty("created_at");
   });
 
+  it("creates a new thread with null title when title is omitted", async () => {
+    const agent = await seedAgent(db);
+
+    const response = await handlePostThread(db, {
+      agentId: agent.id,
+    });
+    const data = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(data.title).toBeNull();
+    expect(data.agent_id).toBe(agent.id);
+  });
+
   it("returns 400 if agentId is missing", async () => {
     const response = await handlePostThread(db, {} as { agentId: string });
     const data = await response.json();

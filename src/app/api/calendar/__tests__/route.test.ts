@@ -1,10 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
-import { handleGetCalendarEvents } from "../route";
+import { NextRequest } from "next/server";
+import { GET, handleGetCalendarEvents } from "../route";
 import type { CalendarResponse } from "@/types/calendar.types";
 
 // Mock the server-only module so it doesn't throw in test environment
+const fetchTodayEventsMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/server/google-calendar", () => ({
-  fetchTodayEvents: vi.fn(),
+  fetchTodayEvents: fetchTodayEventsMock,
 }));
 
 function mockFetcher(response: Partial<CalendarResponse>) {
@@ -116,5 +119,50 @@ describe("GET /api/calendar", () => {
     await handleGetCalendarEvents(fetcher, "Asia/Tokyo");
 
     expect(fetcher).toHaveBeenCalledWith("Asia/Tokyo");
+  });
+
+  it("GET route passes valid tz query string to handler", async () => {
+    fetchTodayEventsMock.mockResolvedValue({
+      events: [],
+      errors: [],
+      fetchedAt: "2026-02-13T00:00:00.000Z",
+      date: "2026-02-13",
+      isConfigured: true,
+    });
+
+    const response = await GET(new NextRequest("http://localhost:3000/api/calendar?tz=Asia/Tokyo"));
+
+    expect(response.status).toBe(200);
+    expect(fetchTodayEventsMock).toHaveBeenCalledWith("Asia/Tokyo");
+  });
+
+  it("GET route falls back to UTC for invalid tz query param", async () => {
+    fetchTodayEventsMock.mockResolvedValue({
+      events: [],
+      errors: [],
+      fetchedAt: "2026-02-13T00:00:00.000Z",
+      date: "2026-02-13",
+      isConfigured: true,
+    });
+
+    const response = await GET(new NextRequest("http://localhost:3000/api/calendar?tz=not-a-zone"));
+
+    expect(response.status).toBe(200);
+    expect(fetchTodayEventsMock).toHaveBeenCalledWith("UTC");
+  });
+
+  it("GET route handles missing tz query by delegating UTC", async () => {
+    fetchTodayEventsMock.mockResolvedValue({
+      events: [],
+      errors: [],
+      fetchedAt: "2026-02-13T00:00:00.000Z",
+      date: "2026-02-13",
+      isConfigured: true,
+    });
+
+    const response = await GET(new NextRequest("http://localhost:3000/api/calendar"));
+
+    expect(response.status).toBe(200);
+    expect(fetchTodayEventsMock).toHaveBeenCalledWith("UTC");
   });
 });

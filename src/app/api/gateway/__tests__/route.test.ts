@@ -642,4 +642,406 @@ describe("POST /api/gateway", () => {
       .where(eq(schema.threads.id, threadId));
     expect(threadAfter.last_activity_at.getTime()).toBeGreaterThan(beforeTimestamp);
   });
+
+  it("parses trailing SSE buffer content without trailing separator", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(`data: ${JSON.stringify({ type: "RUN_FINISHED", threadId, runId: "run-id" })}`, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      })
+    );
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        threadId,
+        agentId,
+        message: "hello",
+      }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    const body = await readSSEBody(res);
+    const events = parseSSEEvents(body);
+
+    expect(events.find((event) => event.type === "RUN_FINISHED")).toBeDefined();
+
+    const runs = await db.select().from(schema.runs);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].status).toBe("completed");
+  });
+
+  it("marks run failed when the stream throws during read", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    const encoder = new TextEncoder();
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ type: "RUN_STARTED", threadId, runId: "run-id" })}\\n\\n`
+          )
+        );
+        controller.error(new Error("stream read failure"));
+      },
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(body, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      })
+    );
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        threadId,
+        agentId,
+        message: "go",
+      }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    const bodyText = await readSSEBody(res);
+    const events = parseSSEEvents(bodyText);
+
+    const errorEvent = events.find((event) => event.type === "RUN_ERROR");
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent!.code).toBe("INTERNAL_ERROR");
+
+    const allRuns = await db.select().from(schema.runs);
+    expect(allRuns[0].status).toBe("failed");
+    expect(allRuns[0].error).toContain("Stream interrupted");
+  });
+
+  it("uses default timeout when AGENT_TIMEOUT_MS is invalid", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    vi.stubEnv("AGENT_TIMEOUT_MS", "not-a-number");
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      buildMockAgentSSEResponse(threadId, "run-1", "ok")
+    );
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId, agentId, message: "hello" }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    await readSSEBody(res);
+
+    const runs = await db.select().from(schema.runs);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].status).toBe("completed");
+
+    vi.unstubAllEnvs();
+  });
+
+  it("falls back to AGENT_UNREACHABLE unknown error when fetch rejects with non-Error", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce("network fail" as unknown as Error);
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId, agentId, message: "go" }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    const body = await readSSEBody(res);
+    const events = parseSSEEvents(body);
+
+    const errorEvent = events.find((event) => event.type === "RUN_ERROR");
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent!.code).toBe("AGENT_UNREACHABLE");
+    expect(errorEvent!.message).toBe("Unknown error");
+  });
+
+  it("attaches and removes client abort listener when request has signal", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    const controller = new AbortController();
+    const addSpy = vi.spyOn(controller.signal, "addEventListener");
+    const removeSpy = vi.spyOn(controller.signal, "removeEventListener");
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      buildMockAgentSSEResponse(threadId, "run-1", "hello")
+    );
+
+    const req = {
+      signal: controller.signal,
+      json: async () => ({ threadId, agentId, message: "hello" }),
+    } as unknown as Request;
+
+    const res = await handleGatewayPost(req, db);
+    await readSSEBody(res);
+
+    expect(addSpy).toHaveBeenCalledWith("abort", expect.any(Function));
+    expect(removeSpy).toHaveBeenCalledWith("abort", expect.any(Function));
+  });
+
+  it("returns AGENT_ERROR when agent response has no body", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId, agentId, message: "hello" }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    const body = await readSSEBody(res);
+    const events = parseSSEEvents(body);
+
+    const errorEvent = events.find((event) => event.type === "RUN_ERROR");
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent!.code).toBe("AGENT_ERROR");
+    expect(errorEvent!.message).toBe("Empty response from agent");
+  });
+
+  it("handles malformed SSE segments without parsing errors", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    const malformedBody = `not-prefixed\n\ndata: {invalid-json\n\n`;
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(malformedBody, { status: 200, headers: { "Content-Type": "text/event-stream" } })
+    );
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId, agentId, message: "hello" }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    const body = await readSSEBody(res);
+    expect(body.startsWith("data: ")).toBe(true);
+
+    const bodyText = body
+      .split("\n\n")
+      .filter((chunk) => chunk.startsWith("data: "))
+      .map((chunk) => {
+        try {
+          return JSON.parse(chunk.replace("data: ", ""));
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean)
+      .map((event) => event.type)
+      .join(",");
+    expect(bodyText).toContain("USER_MESSAGE_CREATED");
+
+    const assistantMessages = await db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.thread_id, threadId));
+    expect(assistantMessages.filter((message) => message.role === "assistant")).toHaveLength(0);
+  });
+
+  it("handles empty SSE delta payloads and missing assistant message id", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    const body = [
+      { type: "RUN_STARTED", threadId, runId: "run-id-empty" },
+      { type: "TEXT_MESSAGE_START", role: "assistant" },
+      { type: "TEXT_MESSAGE_CONTENT" },
+      { type: "TEXT_MESSAGE_END" },
+      { type: "RUN_FINISHED", threadId, runId: "run-id-empty" },
+    ]
+      .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+      .join("");
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } })
+    );
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId, agentId, message: "hello" }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    await readSSEBody(res);
+
+    const assistantMessages = await db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.thread_id, threadId));
+    expect(assistantMessages.filter((message) => message.role === "assistant")).toHaveLength(0);
+  });
+
+  it("falls back to random UUID for assistant message id when missing in START event", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    const generatedId = "assistant-id-fallback";
+    const randomUUIDSpy = vi
+      .spyOn(globalThis.crypto, "randomUUID")
+      .mockReturnValueOnce("user-message-id")
+      .mockReturnValueOnce("run-id")
+      .mockReturnValueOnce(generatedId);
+
+    const body = [
+      { type: "RUN_STARTED", threadId, runId: "run-id-fallback" },
+      { type: "TEXT_MESSAGE_START", role: "assistant" },
+      { type: "TEXT_MESSAGE_CONTENT", delta: "Hello" },
+      { type: "TEXT_MESSAGE_END", messageId: undefined },
+      { type: "RUN_FINISHED", threadId, runId: "run-id-fallback" },
+    ]
+      .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+      .join("");
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } })
+    );
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId, agentId, message: "hello" }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    await readSSEBody(res);
+
+    const assistantMessages = await db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.thread_id, threadId));
+    const assistantMessage = assistantMessages.find((message) => message.role === "assistant");
+    expect(assistantMessage?.id).toBe(generatedId);
+
+    randomUUIDSpy.mockRestore();
+  });
+
+  it("returns 400 when request JSON body is invalid", async () => {
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not valid json",
+    });
+
+    const res = await handleGatewayPost(req, db);
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toBe("Invalid JSON body");
+  });
+
+  it("handles already-aborted request signal as client disconnect", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    const abortedController = new AbortController();
+    abortedController.abort();
+
+    const req = {
+      signal: abortedController.signal,
+      json: async () => ({ threadId, agentId, message: "hello" }),
+    } as unknown as Request;
+
+    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("Should not be called"));
+
+    const res = await handleGatewayPost(req, db);
+    const body = await readSSEBody(res);
+    const events = parseSSEEvents(body);
+
+    const errorEvent = events.find((event) => event.type === "RUN_ERROR");
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent!.code).toBe("AGENT_TIMEOUT");
+    expect(errorEvent!.message).toBe("Client disconnected");
+
+    const allRuns = await db.select().from(schema.runs);
+    expect(allRuns[0].status).toBe("cancelled");
+  });
+
+  it("skips request signal listeners when signal is missing", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    const body = [
+      { type: "RUN_STARTED", threadId, runId: "run-no-signal" },
+      { type: "RUN_FINISHED", threadId, runId: "run-no-signal" },
+    ]
+      .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+      .join("");
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } })
+    );
+
+    const req = {
+      json: async () => ({ threadId, agentId, message: "hello" }),
+    } as unknown as Request;
+
+    const res = await handleGatewayPost(req, db);
+    await readSSEBody(res);
+
+    const runs = await db.select().from(schema.runs);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].status).toBe("completed");
+  });
+
+  it("ignores final trailing non-SSE buffer while parsing stream", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    const body = `data: ${JSON.stringify({ type: "RUN_STARTED", threadId, runId: "run-id" })}\n\nnot-sse-data`;
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } })
+    );
+
+    const req = new Request("http://localhost:3000/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId, agentId, message: "hello" }),
+    });
+
+    const res = await handleGatewayPost(req, db);
+    const bodyText = await readSSEBody(res);
+
+    const events = bodyText
+      .split("\n\n")
+      .filter((chunk) => chunk.startsWith("data: "))
+      .map((chunk) => {
+        try {
+          return JSON.parse(chunk.replace("data: ", ""));
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean)
+      .map((event) => event.type);
+
+    expect(events.some((eventType) => eventType === "RUN_STARTED")).toBe(true);
+  });
+
+  it("handles fetch failures as AGENT_UNREACHABLE when signal is missing", async () => {
+    const { agentId, threadId } = await seedTestData(db);
+
+    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("network down"));
+
+    const req = {
+      json: async () => ({ threadId, agentId, message: "hello" }),
+    } as unknown as Request;
+
+    const res = await handleGatewayPost(req, db);
+    const body = await readSSEBody(res);
+    const events = parseSSEEvents(body);
+
+    const errorEvent = events.find((event) => event.type === "RUN_ERROR");
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent!.code).toBe("AGENT_UNREACHABLE");
+
+    const runs = await db.select().from(schema.runs);
+    expect(runs[0].status).toBe("failed");
+  });
 });
