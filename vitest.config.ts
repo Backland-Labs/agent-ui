@@ -5,10 +5,10 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "db/**/*.test.ts"],
     coverage: {
       provider: "v8",
-      include: ["src/lib/**", "src/app/api/**"],
+      include: ["src/lib/**", "src/app/api/**", "db/**"],
       exclude: [
         "src/lib/hooks/**",
         "src/lib/agents/index.ts",

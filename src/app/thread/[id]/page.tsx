@@ -4,29 +4,26 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThreadContent } from "./ThreadContent";
-import { loadAgentsConfig, getAgentById } from "@/lib/agents";
+import { db } from "../../../../db/client";
+import { threads, agents } from "../../../../db/schema";
+import { eq } from "drizzle-orm";
 
 interface ThreadPageProps {
   params: Promise<{
     id: string;
   }>;
-  searchParams: Promise<{
-    agent?: string;
-  }>;
 }
 
-export default async function ThreadPage({ params, searchParams }: ThreadPageProps) {
+export default async function ThreadPage({ params }: ThreadPageProps) {
   const { id } = await params;
-  const { agent: agentId } = await searchParams;
-  const agents = loadAgentsConfig();
 
-  // For new threads, use the agent query param; for existing threads, we'd fetch from DB
-  // For now, default to first agent if no agent specified
-  const agent = agentId ? getAgentById(agentId) : agents[0];
+  const thread = await db.select().from(threads).where(eq(threads.id, id)).get();
 
-  if (!agent) {
-    notFound();
-  }
+  if (!thread) notFound();
+
+  const agent = await db.select().from(agents).where(eq(agents.id, thread.agent_id)).get();
+
+  if (!agent) notFound();
 
   return (
     <div className="flex h-full flex-col">
@@ -44,7 +41,7 @@ export default async function ThreadPage({ params, searchParams }: ThreadPagePro
       </header>
       <main className="flex-1 overflow-hidden">
         <Suspense fallback={<ThreadSkeleton />}>
-          <ThreadContent threadId={id} agent={agent} />
+          <ThreadContent threadId={thread.id} agent={agent} />
         </Suspense>
       </main>
     </div>

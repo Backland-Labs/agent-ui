@@ -1,8 +1,8 @@
-import { db } from "./client";
+import { db as defaultDb } from "./client";
 import { agents } from "./schema";
 import { loadAgentsConfig } from "@/lib/agents";
 
-export async function syncAgentsToDb() {
+export async function syncAgentsToDb(db = defaultDb) {
   const config = loadAgentsConfig();
   for (const agent of config) {
     await db
