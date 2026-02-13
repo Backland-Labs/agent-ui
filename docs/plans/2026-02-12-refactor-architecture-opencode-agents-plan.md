@@ -423,12 +423,12 @@ type GatewayError = {
 
 **Acceptance criteria:**
 
-- [ ] Agent timeout after 120s (configurable) produces structured error
-- [ ] Unreachable agent produces structured error (not a crash)
-- [ ] Error messages appear inline in chat with retry option
-- [ ] Run records capture error details
-- [ ] Health check endpoint updates agent status in DB
-- [ ] Sidebar reflects agent online/offline/unknown status
+- [x] Agent timeout after 120s (configurable) produces structured error
+- [x] Unreachable agent produces structured error (not a crash)
+- [x] Error messages appear inline in chat with retry option
+- [x] Run records capture error details
+- [x] Health check endpoint updates agent status in DB
+- [x] Sidebar reflects agent online/offline/unknown status
 
 ---
 
@@ -436,25 +436,25 @@ type GatewayError = {
 
 **Unit tests (Vitest):**
 
-- [ ] Drizzle schema: table creation, foreign keys, constraints
-- [ ] `syncAgentsToDb()`: upserts agents correctly, handles duplicates
-- [ ] Gateway route: message persistence, run lifecycle state transitions
-- [ ] `useAgentChat` hook: message loading, sending, streaming state, abort
-- [ ] `useInbox` hook: thread listing, agent filtering, thread creation
-- [ ] Error mapping: all GatewayError codes produced correctly
+- [x] Drizzle schema: table creation, foreign keys, constraints
+- [x] `syncAgentsToDb()`: upserts agents correctly, handles duplicates
+- [x] Gateway route: message persistence, run lifecycle state transitions
+- [x] `useAgentChat` hook: message loading, sending, streaming state, abort
+- [x] `useInbox` hook: thread listing, agent filtering, thread creation
+- [x] Error mapping: all GatewayError codes produced correctly
 
 **Integration tests:**
 
-- [ ] Full SSE run lifecycle against mock agent: `RUN_STARTED` -> content -> `RUN_FINISHED`
-- [ ] SSE error lifecycle: agent returns error -> run marked failed -> error returned to client
-- [ ] SSE cancellation: client aborts -> run marked cancelled
-- [ ] Thread-agent resolution: create thread, query thread, agent matches
+- [x] Full SSE run lifecycle against mock agent: `RUN_STARTED` -> content -> `RUN_FINISHED`
+- [x] SSE error lifecycle: agent returns error -> run marked failed -> error returned to client
+- [x] SSE cancellation: client aborts -> run marked cancelled
+- [x] Thread-agent resolution: create thread, query thread, agent matches
 
 **E2E tests (Playwright):**
 
-- [ ] Create thread from sidebar, send message, see response
-- [ ] Reload thread page, message history persists
-- [ ] Create second thread with different agent, inbox shows both
+- [x] Create thread from sidebar, send message, see response
+- [x] Reload thread page, message history persists
+- [x] Create second thread with different agent, inbox shows both
 - [ ] Filter inbox by agent
 - [ ] Stop generation mid-stream
 - [ ] Agent offline: error shown inline with retry option
