@@ -5,80 +5,43 @@ import { useState, useEffect } from "react";
 import { InboxList } from "./InboxList";
 import { NewThreadButton } from "./NewThreadButton";
 import type { AgentConfig } from "@/lib/agents/types";
-import type { InboxItem } from "@/types/database.types";
+import type { InboxThread } from "@/types";
 
 interface InboxContentProps {
   agents: AgentConfig[];
 }
 
-// Mock data for development without Supabase
-const mockThreads: InboxItem[] = [
-  {
-    id: "1",
-    agent_id: "mock-assistant",
-    title: "Hello World",
-    status: "active",
-    last_activity_at: new Date().toISOString(),
-    created_at: new Date(Date.now() - 3600000).toISOString(),
-    agent_name: "Mock Assistant",
-    agent_icon: null,
-    last_message: "Hello! I'm a mock AI assistant for testing the Agent UI.",
-    last_message_role: "assistant",
-    last_message_at: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    agent_id: "mock-assistant",
-    title: "Code Discussion",
-    status: "active",
-    last_activity_at: new Date(Date.now() - 7200000).toISOString(),
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-    agent_name: "Mock Assistant",
-    agent_icon: null,
-    last_message: "The Agent UI is built with Next.js, TypeScript, and shadcn/ui...",
-    last_message_role: "assistant",
-    last_message_at: new Date(Date.now() - 7200000).toISOString(),
-  },
-];
-
 export function InboxContent({ agents }: InboxContentProps) {
   const searchParams = useSearchParams();
   const agentFilter = searchParams.get("agent");
-  const [threads, setThreads] = useState<InboxItem[]>([]);
+  const [threads, setThreads] = useState<InboxThread[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => {
-      // Filter threads by agent if filter is active
-      const filteredThreads = agentFilter
-        ? mockThreads.filter((t) => t.agent_id === agentFilter)
-        : mockThreads;
-      setThreads(filteredThreads);
-      setLoading(false);
-    }, 500);
-
-    return () => clearTimeout(timer);
+    async function fetchThreads() {
+      try {
+        const params = new URLSearchParams();
+        if (agentFilter) params.set("agent", agentFilter);
+        const res = await fetch(`/api/threads?${params}`);
+        if (res.ok) {
+          const data = await res.json();
+          setThreads(data);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchThreads();
   }, [agentFilter]);
 
   const handleCreateThread = async (agentId: string) => {
-    // Mock thread creation
-    const newThread: InboxItem = {
-      id: `thread-${Date.now()}`,
-      agent_id: agentId,
-      title: "New conversation",
-      status: "active",
-      last_activity_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      agent_name: agents.find((a) => a.id === agentId)?.name || "Unknown Agent",
-      agent_icon: null,
-      last_message: null,
-      last_message_role: null,
-      last_message_at: null,
-    };
-
-    setThreads((prev) => [newThread, ...prev]);
-    return { id: newThread.id };
+    const res = await fetch("/api/threads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agentId, title: "New conversation" }),
+    });
+    const thread = await res.json();
+    return { id: thread.id };
   };
 
   return (

@@ -5,10 +5,10 @@ import { Inbox } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InboxItem } from "./InboxItem";
-import type { InboxItem as InboxItemType } from "@/types/database.types";
+import type { InboxThread } from "@/types";
 
 interface InboxListProps {
-  threads: InboxItemType[];
+  threads: InboxThread[];
   loading: boolean;
   activeThreadId?: string;
 }

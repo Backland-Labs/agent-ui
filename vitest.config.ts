@@ -11,10 +11,8 @@ export default defineConfig({
       include: ["src/lib/**", "src/app/api/**"],
       exclude: [
         "src/lib/hooks/**",
-        "src/lib/supabase/**",
         "src/lib/agents/index.ts",
         "src/lib/agents/types.ts",
-        "src/app/api/copilotkit/**",
         "**/__tests__/**",
       ],
       thresholds: {

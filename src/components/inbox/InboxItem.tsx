@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import type { InboxItem as InboxItemType } from "@/types/database.types";
+import type { InboxThread } from "@/types";
 
 interface InboxItemProps {
-  thread: InboxItemType;
+  thread: InboxThread;
   isActive?: boolean;
 }
 

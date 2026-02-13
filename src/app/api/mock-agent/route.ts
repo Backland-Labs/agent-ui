@@ -37,7 +37,7 @@ function getMockResponse(userMessage: string): string {
   }
 
   if (lowerMessage.includes("code") || lowerMessage.includes("programming")) {
-    return "While I'm just a mock agent, I can tell you that the Agent UI is built with:\n\n- **Next.js 14+** with App Router\n- **TypeScript** for type safety\n- **Tailwind CSS** for styling\n- **shadcn/ui** for components\n- **CopilotKit** for AG-UI protocol handling\n- **Supabase** for persistence\n\nPretty neat stack!";
+    return "While I'm just a mock agent, I can tell you that the Agent UI is built with:\n\n- **Next.js 16** with App Router\n- **TypeScript** for type safety\n- **Tailwind CSS** for styling\n- **shadcn/ui** for components\n- **AG-UI protocol** for agent communication\n- **Turso + Drizzle** for persistence\n\nPretty neat stack!";
   }
 
   return `Thanks for your message! You said: "${userMessage}"\n\nI'm a mock agent for testing purposes. I can respond to greetings, help requests, questions about the weather, or programming topics. What would you like to talk about?`;
