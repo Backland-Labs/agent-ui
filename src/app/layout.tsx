@@ -6,6 +6,7 @@ import { syncAgentsToDb } from "../../db/sync-agents";
 import { db } from "../../db/client";
 import { agents } from "../../db/schema";
 import { loadAgentsConfig } from "@/lib/agents";
+import { logger } from "@/lib/server/logger";
 
 const instrumentSerif = Instrument_Serif({
   variable: "--font-instrument-serif",
@@ -54,7 +55,8 @@ export default async function RootLayout({
       icon: a.icon ?? undefined,
       description: a.description ?? undefined,
     }));
-  } catch {
+  } catch (error) {
+    logger.warn({ event: "layout.agent_sync_failed", err: error }, "agent sync failed");
     agentConfigs = loadAgentsConfig().map((a) => ({
       id: a.id,
       name: a.name,
