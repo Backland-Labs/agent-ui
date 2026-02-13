@@ -28,8 +28,9 @@ bun run format            # Format all files
 bun run format:check      # Check formatting (CI)
 bun run typecheck         # Type-check without emitting
 
-# Supabase (local)
-npx supabase start   # Start local Supabase (serves at localhost:54321)
+# Database
+# Local dev uses file:local.db (no setup needed)
+# For Turso cloud, set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN
 ```
 
 ## Architecture
@@ -44,7 +45,7 @@ Multi-agent inbox UI built with Next.js 16 (App Router) that communicates with A
 
 3. **Chat Interface**: `ChatThread` wraps CopilotKit's `useCopilotChat()` hook which manages streaming messages, loading states, and stop-generation. Messages are transformed between CopilotKit's internal format and the UI's `MessageBubble` components.
 
-4. **Data Persistence**: Supabase PostgreSQL stores agents, threads, and messages. The `inbox_view` SQL view denormalizes thread data with last-message previews. Realtime is enabled on the messages table.
+4. **Data Persistence**: Turso (libSQL/SQLite) stores agents, threads, and messages. Local dev uses a file-based SQLite database (`file:local.db`); production uses Turso cloud.
 
 ### Key Directories
 
@@ -54,10 +55,8 @@ Multi-agent inbox UI built with Next.js 16 (App Router) that communicates with A
 - `src/components/providers/` — AppLayout root client component
 - `src/components/ui/` — shadcn/ui primitives (New York style, Lucide icons)
 - `src/lib/agents/` — Agent config loading and types
-- `src/lib/hooks/` — Supabase data hooks (useInbox, useMessages)
-- `src/lib/supabase/` — Browser and server Supabase clients
-- `src/types/database.types.ts` — Generated Supabase types
-- `supabase/migrations/` — Database schema migrations
+- `src/lib/hooks/` — Data hooks (useInbox, useMessages)
+- `db/` — Turso/libSQL client, schema, and migrations
 
 ### Routes
 
@@ -72,5 +71,7 @@ Multi-agent inbox UI built with Next.js 16 (App Router) that communicates with A
 - **Package manager**: Bun
 - **UI components**: shadcn/ui (Radix UI + Tailwind CSS 4)
 - **Path alias**: `@/` maps to `src/`
-- **Database**: Supabase (local dev at `localhost:54321`)
-- **Env vars**: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (see `.env.example`)
+- **Database**: Turso (libSQL/SQLite); local dev uses `file:local.db`
+- **Networking**: Tailscale (private access to agent endpoints)
+- **Hosting**: Railway
+- **Env vars**: `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` (see `.env.example`)

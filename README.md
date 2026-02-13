@@ -5,7 +5,6 @@ Multi-agent inbox UI built with Next.js 16 (App Router) that communicates with A
 ## Prerequisites
 
 - [Bun](https://bun.sh/) (package manager and runtime)
-- [Supabase CLI](https://supabase.com/docs/guides/cli) (for local database)
 
 ## Setup
 
@@ -15,19 +14,15 @@ Multi-agent inbox UI built with Next.js 16 (App Router) that communicates with A
 bun install
 ```
 
-2. Copy the environment file and fill in your Supabase credentials:
+2. Copy the environment file:
 
 ```bash
 cp .env.example .env.local
 ```
 
-3. Start local Supabase:
+Local dev uses a file-based SQLite database (`file:local.db`) by default -- no external services needed. For production, set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` for Turso cloud.
 
-```bash
-npx supabase start
-```
-
-4. Start the dev server:
+3. Start the dev server:
 
 ```bash
 bun dev
@@ -61,7 +56,7 @@ Agents are defined in `agents.config.json` at the project root. Each entry has a
 1. **Agent Configuration** -- Agents defined in `agents.config.json` are loaded at startup.
 2. **AG-UI Protocol Bridge** -- The `/api/copilotkit` route creates a `CopilotRuntime` that instantiates `HttpAgent` instances for each configured agent, bridging CopilotKit to remote AG-UI endpoints.
 3. **Chat Interface** -- `ChatThread` wraps CopilotKit's `useCopilotChat()` hook for streaming messages, loading states, and stop-generation.
-4. **Data Persistence** -- Supabase PostgreSQL stores agents, threads, and messages. An `inbox_view` SQL view denormalizes thread data with last-message previews. Realtime is enabled on the messages table.
+4. **Data Persistence** -- Turso (libSQL/SQLite) stores agents, threads, and messages. Local dev uses a file-based SQLite database; production uses Turso cloud.
 
 ### Key Directories
 
@@ -75,11 +70,9 @@ src/
     ui/          -- shadcn/ui primitives
   lib/
     agents/      -- Agent config loading and types
-    hooks/       -- Supabase data hooks (useInbox, useMessages)
-    supabase/    -- Browser and server Supabase clients
-  types/         -- Generated Supabase types
-supabase/
-  migrations/    -- Database schema migrations
+    hooks/       -- Data hooks (useInbox, useMessages)
+  types/         -- Database types
+db/              -- Turso/libSQL client, schema, and migrations
 ```
 
 ### Routes
@@ -95,7 +88,9 @@ supabase/
 - **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
 - **UI**: shadcn/ui (Radix UI + Tailwind CSS 4)
-- **Database**: Supabase (PostgreSQL + Realtime)
+- **Database**: Turso (libSQL/SQLite); local dev uses `file:local.db`
+- **Networking**: Tailscale (private access to agent endpoints)
+- **Hosting**: Railway
 - **Agent Protocol**: AG-UI via CopilotKit
 - **Testing**: Vitest (unit), Playwright (e2e)
 - **Package Manager**: Bun
