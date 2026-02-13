@@ -1,6 +1,9 @@
 import type { InferSelectModel } from "drizzle-orm";
 import type { agents, threads, messages, runs } from "../../db/schema";
 
+// Calendar types
+export type { CalendarEvent, AccountError, CalendarResponse } from "./calendar.types";
+
 // Row types derived from Drizzle schema
 export type Agent = InferSelectModel<typeof agents>;
 export type Thread = InferSelectModel<typeof threads>;

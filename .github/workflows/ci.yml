@@ -1,5 +1,8 @@
 name: CI
 on: [push, pull_request]
+permissions:
+  contents: read
+  pull-requests: write
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -14,3 +17,70 @@ jobs:
       - run: bun run lint
       - run: bun run format:check
       - run: bun run test:coverage
+      - name: Comment coverage report on pull request
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const path = "coverage/coverage-summary.json";
+            if (!fs.existsSync(path)) {
+              core.warning(`Coverage summary not found at ${path}`);
+              return;
+            }
+
+            const report = JSON.parse(fs.readFileSync(path, "utf8"));
+            const total = report.total || {};
+
+            const fmt = (pct = 0) => `${pct.toFixed(2)}%`;
+            const lines = [
+              "| Metric | Value |",
+              "| --- | --- |",
+              `| Statements | ${fmt(total.statements?.pct)} |`,
+              `| Branches | ${fmt(total.branches?.pct)} |`,
+              `| Functions | ${fmt(total.functions?.pct)} |`,
+              `| Lines | ${fmt(total.lines?.pct)} |`,
+            ].join("\n");
+
+            const body = `
+            <!-- coverage-comment -->
+            ### Coverage summary
+            ${lines}
+            `;
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = context.payload.pull_request.number;
+
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner,
+                repo,
+                issue_number,
+                per_page: 100,
+              }
+            );
+
+            const previous = comments.find(
+              (comment) =>
+                comment.user &&
+                comment.user.type === "Bot" &&
+                comment.body.includes("<!-- coverage-comment -->")
+            );
+
+            if (previous) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: previous.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
