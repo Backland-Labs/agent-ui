@@ -1,2 +1,1 @@
-export { useInbox } from "./useInbox";
-export { useMessages } from "./useMessages";
+export { useAgentChat } from "./useAgentChat";

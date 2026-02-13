@@ -47,35 +47,40 @@ export function ChatInput({
   };
 
   return (
-    <div className="border-t px-6 py-4">
-      <div className="flex items-end gap-2 max-w-3xl mx-auto">
-        <div className="relative flex-1">
-          <textarea
-            ref={textareaRef}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            disabled={disabled}
-            rows={1}
-            className={cn(
-              "w-full resize-none rounded-lg border bg-background px-3.5 py-2.5",
-              "text-[13px] placeholder:text-muted-foreground/50",
-              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20",
-              "disabled:cursor-not-allowed disabled:opacity-50",
-              "min-h-[42px] max-h-[200px] transition-shadow"
-            )}
-          />
-        </div>
+    <div className="px-6 py-4">
+      <div
+        className={cn(
+          "flex items-end gap-2.5 max-w-3xl mx-auto",
+          "rounded-2xl border border-border/40 bg-accent/30 backdrop-blur-sm",
+          "px-4 py-3 transition-all duration-300",
+          "focus-within:border-primary/30 focus-within:shadow-[0_0_24px_-6px] focus-within:shadow-primary/15"
+        )}
+      >
+        <textarea
+          ref={textareaRef}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          disabled={disabled}
+          rows={1}
+          className={cn(
+            "flex-1 resize-none bg-transparent border-0",
+            "text-[13px] leading-relaxed placeholder:text-muted-foreground/30",
+            "focus-visible:outline-none focus-visible:ring-0",
+            "disabled:cursor-not-allowed disabled:opacity-50",
+            "min-h-[24px] max-h-[200px]"
+          )}
+        />
         {isLoading ? (
           <Button
             type="button"
             size="icon"
-            variant="outline"
+            variant="ghost"
             onClick={onStop}
-            className="h-[42px] w-[42px] shrink-0"
+            className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50"
           >
-            <Square className="h-3.5 w-3.5" />
+            <Square className="h-3 w-3" />
             <span className="sr-only">Stop generation</span>
           </Button>
         ) : (
@@ -84,9 +89,9 @@ export function ChatInput({
             size="icon"
             onClick={handleSubmit}
             disabled={!message.trim() || disabled}
-            className="h-[42px] w-[42px] shrink-0"
+            className="h-8 w-8 shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/80 disabled:opacity-20 shadow-[0_0_12px_-2px] shadow-primary/30 transition-all"
           >
-            <ArrowUp className="h-4 w-4" />
+            <ArrowUp className="h-3.5 w-3.5" />
             <span className="sr-only">Send message</span>
           </Button>
         )}

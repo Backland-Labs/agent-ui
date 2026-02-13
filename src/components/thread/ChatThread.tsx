@@ -1,7 +1,7 @@
 "use client";
 
-import { useCopilotChat } from "@copilotkit/react-core";
-import { Role, TextMessage } from "@copilotkit/runtime-client-gql";
+import { useCallback } from "react";
+import { useAgentChat } from "@/lib/hooks/useAgentChat";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
 import type { AgentConfig } from "@/lib/agents/types";
@@ -12,42 +12,30 @@ interface ChatThreadProps {
 }
 
 export function ChatThread({ threadId, agent }: ChatThreadProps) {
-  const { visibleMessages, appendMessage, stopGeneration, isLoading } = useCopilotChat({
-    id: threadId,
+  const { messages, isLoading, error, sendMessage, stopGeneration } = useAgentChat({
+    threadId,
+    agentId: agent.id,
   });
 
-  // Transform CopilotKit messages to our format
-  // Messages have isTextMessage() method and role/content properties
-  const messages = (visibleMessages ?? [])
-    .filter((msg) => {
-      // Check if it's a text message with user or assistant role
-      if ("isTextMessage" in msg && typeof msg.isTextMessage === "function") {
-        return (
-          msg.isTextMessage() && "role" in msg && (msg.role === "user" || msg.role === "assistant")
-        );
-      }
-      return false;
-    })
-    .map((msg) => ({
-      id: msg.id,
-      role: "role" in msg && msg.role === "user" ? ("user" as const) : ("assistant" as const),
-      content: "content" in msg ? String(msg.content || "") : "",
-    }));
-
-  const handleSend = (content: string) => {
-    appendMessage(new TextMessage({ content, role: Role.User }));
-  };
-
-  const handleStop = () => {
-    stopGeneration();
-  };
+  const handleRetry = useCallback(() => {
+    const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
+    if (lastUserMessage) {
+      sendMessage(lastUserMessage.content);
+    }
+  }, [messages, sendMessage]);
 
   return (
     <div className="flex flex-col h-full">
-      <MessageList messages={messages} agentIcon={agent.icon} isLoading={isLoading} />
+      <MessageList
+        messages={messages}
+        agentIcon={agent.icon}
+        isLoading={isLoading}
+        error={error}
+        onRetry={handleRetry}
+      />
       <ChatInput
-        onSend={handleSend}
-        onStop={handleStop}
+        onSend={sendMessage}
+        onStop={stopGeneration}
         isLoading={isLoading}
         placeholder={`Message ${agent.name}...`}
       />
