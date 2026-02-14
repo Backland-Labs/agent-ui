@@ -63,6 +63,50 @@ if (isConfigured) {
 let cache: { data: CalendarResponse; expires: number } | null = null;
 const CACHE_TTL_MS = 60_000;
 
+function normalizeOffset(offset: string | undefined): string {
+  if (!offset) {
+    return "+00:00";
+  }
+
+  const match = offset.match(/^GMT([+-])(\d{1,2})(?::(\d{2}))?$/);
+  if (!match) {
+    return "+00:00";
+  }
+
+  const sign = match[1];
+  const hours = match[2].padStart(2, "0");
+  const minutes = match[3] ?? "00";
+  return `${sign}${hours}:${minutes}`;
+}
+
+function getTimeZoneOffset(date: Date, timezone: string): string {
+  const offset = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    timeZoneName: "shortOffset",
+    hour: "2-digit",
+    hour12: false,
+  })
+    .formatToParts(date)
+    .find((part) => part.type === "timeZoneName")?.value;
+  return normalizeOffset(offset);
+}
+
+function getDateParts(date: Date, timezone: string): { year: string; month: string; day: string } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return {
+    year: byType.year,
+    month: byType.month,
+    day: byType.day,
+  };
+}
+
 // --- Core Fetch ---
 
 async function fetchAccountEvents(
@@ -124,18 +168,15 @@ export async function fetchTodayEvents(timezone: string): Promise<CalendarRespon
     };
   }
 
-  // Compute today's boundaries in the given timezone
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const todayStr = formatter.format(new Date()); // YYYY-MM-DD
-  const timeMin = `${todayStr}T00:00:00`;
-  // timeMax is exclusive in Google Calendar API, so use start of next day
-  const nextDay = new Date(new Date(`${todayStr}T00:00:00Z`).getTime() + 86_400_000);
-  const timeMax = nextDay.toISOString().slice(0, 10) + "T00:00:00";
+  // Compute today's boundaries in the given timezone using RFC3339
+  const nowDate = new Date();
+  const { year, month, day } = getDateParts(nowDate, timezone);
+  const todayStr = `${year}-${month}-${day}`; // YYYY-MM-DD
+  const timeMin = `${todayStr}T00:00:00${getTimeZoneOffset(nowDate, timezone)}`;
+  const tomorrow = new Date(`${todayStr}T00:00:00${getTimeZoneOffset(nowDate, timezone)}`);
+  const tomorrowDate = new Date(tomorrow.getTime() + 86_400_000);
+  const tomorrowParts = getDateParts(tomorrowDate, timezone);
+  const timeMax = `${tomorrowParts.year}-${tomorrowParts.month}-${tomorrowParts.day}T00:00:00${getTimeZoneOffset(tomorrowDate, timezone)}`;
 
   const results = await Promise.allSettled(
     clients.map((client) => fetchAccountEvents(client, timeMin, timeMax, timezone))

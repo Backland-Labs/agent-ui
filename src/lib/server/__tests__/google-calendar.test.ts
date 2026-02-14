@@ -246,8 +246,8 @@ describe("google-calendar", () => {
       1,
       expect.objectContaining({
         calendarId: "primary",
-        timeMin: "2026-02-13T00:00:00",
-        timeMax: "2026-02-14T00:00:00",
+        timeMin: "2026-02-13T00:00:00+00:00",
+        timeMax: "2026-02-14T00:00:00+00:00",
         timeZone: "UTC",
         singleEvents: true,
         orderBy: "startTime",
