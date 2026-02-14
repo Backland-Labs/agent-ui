@@ -3,6 +3,9 @@ import "server-only";
 import { OAuth2Client } from "google-auth-library";
 import { calendar as googleCalendar } from "@googleapis/calendar";
 import type { CalendarEvent, AccountError, CalendarResponse } from "@/types/calendar.types";
+import { logger } from "./logger";
+
+const log = logger.child({ service: "google-calendar" });
 
 // --- Configuration ---
 
@@ -41,8 +44,9 @@ if (isConfigured) {
 
     auth.on("tokens", (tokens) => {
       if (tokens.refresh_token) {
-        console.warn(
-          `[calendar] Account "${account.label}" issued new refresh token. Update env var.`
+        log.warn(
+          { event: "calendar.token_refreshed", accountLabel: account.label },
+          "new refresh token issued"
         );
       }
     });
@@ -148,7 +152,10 @@ export async function fetchTodayEvents(timezone: string): Promise<CalendarRespon
         account: clients[i].label,
         message: "Failed to fetch events",
       });
-      console.error(`[calendar] Failed to fetch events for "${clients[i].label}":`, result.reason);
+      log.error(
+        { event: "calendar.fetch_failed", accountLabel: clients[i].label, err: result.reason },
+        "failed to fetch events"
+      );
     }
   });
 

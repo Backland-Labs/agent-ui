@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { eq, asc } from "drizzle-orm";
 import { db as defaultDb } from "../../../../db/client";
 import * as schema from "../../../../db/schema";
+import { logger } from "@/lib/server/logger";
 
 type Db = typeof defaultDb;
 
@@ -213,6 +214,12 @@ export async function handleGatewayPost(req: Request, db: Db): Promise<Response>
     created_at: new Date(),
   });
 
+  const log = logger.child({ runId, threadId, agentId });
+  log.info(
+    { event: "gateway.started", agentEndpoint: agent.endpoint_url },
+    "gateway request started"
+  );
+
   // 5. Fetch full message history for the thread
   const messageHistory = await db
     .select()
@@ -271,12 +278,14 @@ export async function handleGatewayPost(req: Request, db: Db): Promise<Response>
     }
 
     if (clientDisconnected) {
+      log.warn({ event: "gateway.client_disconnected" }, "client disconnected");
       await cancelRun(db, runId);
       const errorBody = buildRunError(threadId, runId, "AGENT_TIMEOUT", "Client disconnected");
       return new Response(errorBody, { status: 200, headers: sseHeaders(runId) });
     }
 
     const { code, message: errMsg } = classifyFetchError(error, timedOut);
+    log.error({ event: "gateway.request_failed", code, err: error }, "agent fetch failed");
     await failRun(db, runId, errMsg);
     const errorBody = buildRunError(threadId, runId, code, errMsg);
     return new Response(errorBody, { status: 200, headers: sseHeaders(runId) });
@@ -290,6 +299,7 @@ export async function handleGatewayPost(req: Request, db: Db): Promise<Response>
   // 6b. Handle non-200 responses from the agent
   if (!agentResponse.ok) {
     const errMsg = `Agent returned HTTP ${agentResponse.status}: ${agentResponse.statusText}`;
+    log.error({ event: "gateway.request_failed", code: "AGENT_ERROR" }, errMsg);
     await failRun(db, runId, errMsg);
     const errorBody = buildRunError(threadId, runId, "AGENT_ERROR", errMsg);
     return new Response(errorBody, { status: 200, headers: sseHeaders(runId) });
@@ -308,6 +318,10 @@ export async function handleGatewayPost(req: Request, db: Db): Promise<Response>
 
   // If the agent returned no body, close out gracefully
   if (!agentBody) {
+    log.error(
+      { event: "gateway.request_failed", code: "AGENT_ERROR" },
+      "empty response from agent"
+    );
     await failRun(db, runId, "Agent returned empty response body");
     const errorBody =
       userCreatedEvent + buildRunError(threadId, runId, "AGENT_ERROR", "Empty response from agent");
@@ -324,6 +338,7 @@ export async function handleGatewayPost(req: Request, db: Db): Promise<Response>
       const reader = agentBody.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      const streamStart = Date.now();
 
       try {
         while (true) {
@@ -355,7 +370,20 @@ export async function handleGatewayPost(req: Request, db: Db): Promise<Response>
             await persistEvent(event, db, runId, threadId, state);
           }
         }
-      } catch {
+
+        log.info(
+          { event: "gateway.stream_ended", durationMs: Date.now() - streamStart },
+          "stream completed"
+        );
+      } catch (error) {
+        log.error(
+          {
+            event: "gateway.request_failed",
+            code: "INTERNAL_ERROR",
+            err: error,
+          },
+          "stream interrupted"
+        );
         // Stream read error -- mark run failed if not already completed
         await failRun(db, runId, "Stream interrupted");
         controller.enqueue(

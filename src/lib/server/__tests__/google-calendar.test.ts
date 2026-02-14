@@ -2,6 +2,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
+const mockWarn = vi.fn();
+const mockError = vi.fn();
+const mockChildLogger = {
+  trace: vi.fn(),
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: mockWarn,
+  error: mockError,
+  fatal: vi.fn(),
+  child: vi.fn(),
+};
+vi.mock("../logger", () => ({
+  logger: {
+    child: () => mockChildLogger,
+  },
+}));
+
 interface MockOAuthClient {
   setCredentials: ReturnType<typeof vi.fn>;
   on: ReturnType<typeof vi.fn>;
@@ -79,6 +96,8 @@ const loadGoogleCalendar = async () => {
   calendarClientFactoryMock.mockClear();
   oauthClientMock.mockClear();
   oauthClients.length = 0;
+  mockWarn.mockClear();
+  mockError.mockClear();
 
   return import("../google-calendar");
 };
@@ -106,8 +125,6 @@ describe("google-calendar", () => {
   });
 
   it("calls token handlers for refresh token events", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-
     setCalendarEnv({
       GOOGLE_CLIENT_ID: "client-id",
       GOOGLE_CLIENT_SECRET: "client-secret",
@@ -125,9 +142,10 @@ describe("google-calendar", () => {
     tokenListener?.({ refresh_token: undefined });
     tokenListener?.({ refresh_token: "temporary-token" });
 
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy).toHaveBeenCalledWith(
-      '[calendar] Account "personal" issued new refresh token. Update env var.'
+    expect(mockWarn).toHaveBeenCalledTimes(1);
+    expect(mockWarn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "calendar.token_refreshed", accountLabel: "personal" }),
+      expect.any(String)
     );
   });
 
@@ -312,7 +330,6 @@ describe("google-calendar", () => {
     });
 
     const { fetchTodayEvents } = await loadGoogleCalendar();
-    const consoleErrorMock = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     eventsListMock
       .mockResolvedValueOnce({
@@ -336,9 +353,11 @@ describe("google-calendar", () => {
     expect(response.events[0].id).toBe("ok-event");
     expect(response.errors).toEqual([{ account: "work", message: "Failed to fetch events" }]);
     expect(response.isConfigured).toBe(true);
-    expect(consoleErrorMock).toHaveBeenCalledTimes(1);
-
-    consoleErrorMock.mockRestore();
+    expect(mockError).toHaveBeenCalledTimes(1);
+    expect(mockError).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "calendar.fetch_failed", accountLabel: "work" }),
+      expect.any(String)
+    );
   });
 
   it("treats missing calendar items as an empty list", async () => {

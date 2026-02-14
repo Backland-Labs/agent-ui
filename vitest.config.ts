@@ -5,6 +5,9 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     environment: "jsdom",
+    env: {
+      LOG_LEVEL: "silent",
+    },
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "db/**/*.test.ts"],
     coverage: {
       provider: "v8",

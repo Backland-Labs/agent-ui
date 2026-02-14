@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db as defaultDb } from "../../../../../../db/client";
 import { agents } from "../../../../../../db/schema";
+import { logger } from "@/lib/server/logger";
 
 type Db = typeof defaultDb;
 
@@ -35,7 +36,8 @@ export async function handleHealthCheck(
 
     clearTimeout(timeoutId);
     isOnline = response.ok;
-  } catch {
+  } catch (error) {
+    logger.debug({ event: "health.check_failed", agentId, err: error }, "health check failed");
     isOnline = false;
   }
 
