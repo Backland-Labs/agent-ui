@@ -30,7 +30,7 @@ export function MessageBubble({ role, content, isStreaming }: MessageBubbleProps
           "text-[13px] leading-relaxed",
           isUser
             ? "rounded-2xl px-4 py-2.5 max-w-[70%] bg-primary/10 border border-primary/15 text-foreground"
-            : "max-w-[85%] border-l-2 border-primary/15 pl-3.5 py-1 text-foreground/85"
+            : "max-w-[85%] border-l-2 border-primary/15 pl-3.5 py-1 text-foreground/90"
         )}
       >
         <div className="whitespace-pre-wrap break-words">

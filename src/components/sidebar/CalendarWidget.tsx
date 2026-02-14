@@ -110,7 +110,7 @@ function EventRow({
           <p className="text-[11px] font-medium text-foreground/80 truncate">{event.title}</p>
         ) : (
           <>
-            <p className="font-mono text-[10px] tabular-nums text-muted-foreground/60">
+            <p className="font-mono text-[10px] tabular-nums text-muted-foreground/70">
               {event.startTime && formatTime(event.startTime)}
               {event.startTime && event.endTime && " - "}
               {event.endTime && formatTime(event.endTime)}
@@ -168,13 +168,13 @@ export function CalendarWidget() {
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/60">
+      <SidebarGroupLabel className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">
         <span className="flex-1">Today</span>
         <button
           onClick={refresh}
           disabled={loading}
           className={cn(
-            "p-0.5 rounded hover:bg-accent/40 transition-colors text-muted-foreground/40 hover:text-muted-foreground/60",
+            "p-0.5 rounded hover:bg-accent/40 transition-colors text-muted-foreground/50 hover:text-muted-foreground/70",
             loading && "animate-spin"
           )}
           title="Refresh calendar"
@@ -188,8 +188,8 @@ export function CalendarWidget() {
             <CalendarSkeleton />
           ) : hasError ? (
             <div className="flex flex-col items-center py-6 px-4 text-center">
-              <Calendar className="h-5 w-5 text-muted-foreground/30 mb-2" />
-              <p className="text-[11px] text-muted-foreground/50">Couldn&apos;t load calendar</p>
+              <Calendar className="h-5 w-5 text-muted-foreground/40 mb-2" />
+              <p className="text-[11px] text-muted-foreground/60">Couldn&apos;t load calendar</p>
               <button
                 onClick={refresh}
                 className="mt-2 text-[10px] text-primary/60 hover:text-primary/80 transition-colors"
@@ -199,8 +199,8 @@ export function CalendarWidget() {
             </div>
           ) : events.length === 0 ? (
             <div className="flex flex-col items-center py-6 px-4 text-center">
-              <Calendar className="h-5 w-5 text-muted-foreground/30 mb-2" />
-              <p className="text-[11px] text-muted-foreground/50">No events today</p>
+              <Calendar className="h-5 w-5 text-muted-foreground/40 mb-2" />
+              <p className="text-[11px] text-muted-foreground/60">No events today</p>
             </div>
           ) : (
             <div className="py-1">

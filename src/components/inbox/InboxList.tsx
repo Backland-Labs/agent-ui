@@ -42,8 +42,8 @@ export function InboxList({ threads, loading, activeThreadId }: InboxListProps) 
         <div className="w-12 h-12 rounded-full border border-border/30 flex items-center justify-center mb-6">
           <div className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-breathe shadow-[0_0_8px_2px] shadow-primary/20" />
         </div>
-        <h3 className="font-serif italic text-lg text-foreground/40">Silence</h3>
-        <p className="text-xs text-muted-foreground/40 mt-2 max-w-48">
+        <h3 className="font-serif italic text-lg text-foreground/50">Silence</h3>
+        <p className="text-xs text-muted-foreground/55 mt-2 max-w-48">
           {agentFilter ? "Begin a conversation with this agent" : "Select an agent to begin"}
         </p>
       </div>

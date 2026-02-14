@@ -27,14 +27,14 @@ export default async function ThreadPage({ params }: ThreadPageProps) {
   return (
     <div className="flex h-full flex-col">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/40 px-4">
-        <SidebarTrigger className="-ml-1 text-muted-foreground/50 hover:text-foreground transition-colors" />
+        <SidebarTrigger className="-ml-1 text-muted-foreground/60 hover:text-foreground transition-colors" />
         <Separator orientation="vertical" className="mr-2 h-4 bg-border/30" />
         <div className="flex items-center gap-2.5">
-          <div className="h-6 w-6 rounded-full bg-accent border border-border/40 text-foreground/60 flex items-center justify-center text-[10px] font-medium">
+          <div className="h-6 w-6 rounded-full bg-accent border border-border/40 text-foreground/70 flex items-center justify-center text-[10px] font-medium">
             {agent.name.charAt(0).toUpperCase()}
           </div>
           <div>
-            <h1 className="text-sm text-foreground/80">{agent.name}</h1>
+            <h1 className="text-sm text-foreground/90">{agent.name}</h1>
           </div>
         </div>
       </header>

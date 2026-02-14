@@ -82,7 +82,7 @@ export function AgentSidebar({ agents }: AgentSidebarProps) {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/60">
+          <SidebarGroupLabel className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">
             Agents
           </SidebarGroupLabel>
           <SidebarGroupContent>

@@ -66,7 +66,7 @@ export function ChatInput({
           rows={1}
           className={cn(
             "flex-1 resize-none bg-transparent border-0",
-            "text-[13px] leading-relaxed placeholder:text-muted-foreground/30",
+            "text-[13px] leading-relaxed placeholder:text-muted-foreground/40",
             "focus-visible:outline-none focus-visible:ring-0",
             "disabled:cursor-not-allowed disabled:opacity-50",
             "min-h-[24px] max-h-[200px]"

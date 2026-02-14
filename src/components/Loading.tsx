@@ -9,8 +9,8 @@ interface LoadingProps {
 export function Loading({ message = "Loading..." }: LoadingProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[200px] gap-3">
-      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/50" />
-      <p className="text-xs text-muted-foreground/70">{message}</p>
+      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
+      <p className="text-xs text-muted-foreground/80">{message}</p>
     </div>
   );
 }
@@ -18,8 +18,8 @@ export function Loading({ message = "Loading..." }: LoadingProps) {
 export function FullPageLoading({ message }: LoadingProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-3">
-      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/50" />
-      {message && <p className="text-sm text-muted-foreground/70">{message}</p>}
+      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/60" />
+      {message && <p className="text-sm text-muted-foreground/80">{message}</p>}
     </div>
   );
 }

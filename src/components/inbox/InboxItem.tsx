@@ -49,12 +49,12 @@ export function InboxItem({ thread, isActive }: InboxItemProps) {
             <h3 className="text-[13px] font-medium truncate text-foreground/90">
               {thread.title || "Untitled conversation"}
             </h3>
-            <span className="font-mono text-[10px] text-muted-foreground/40 whitespace-nowrap shrink-0">
+            <span className="font-mono text-[10px] text-muted-foreground/55 whitespace-nowrap shrink-0">
               {timeAgo}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground/60 mt-0.5">{thread.agent_name}</p>
-          <p className="text-xs text-muted-foreground/35 mt-1 line-clamp-1">{truncatedMessage}</p>
+          <p className="text-xs text-muted-foreground/70 mt-0.5">{thread.agent_name}</p>
+          <p className="text-xs text-muted-foreground/50 mt-1 line-clamp-1">{truncatedMessage}</p>
         </div>
       </div>
     </Link>

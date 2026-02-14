@@ -53,7 +53,7 @@ export function InboxContent({ agents }: InboxContentProps) {
               ? `${agents.find((a) => a.id === agentFilter)?.name || "Agent"}`
               : "All Threads"}
           </h2>
-          <p className="font-mono text-[10px] text-muted-foreground/50 mt-0.5 uppercase tracking-wider">
+          <p className="font-mono text-[10px] text-muted-foreground/60 mt-0.5 uppercase tracking-wider">
             {threads.length} conversation{threads.length !== 1 ? "s" : ""}
           </p>
         </div>

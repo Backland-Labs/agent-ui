@@ -67,7 +67,7 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body
         className={`${instrumentSerif.variable} ${outfit.variable} ${jetbrainsMono.variable} antialiased`}
       >
