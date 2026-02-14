@@ -133,4 +133,53 @@ describe("useDailyDigest", () => {
       expect(spy).toHaveBeenCalledTimes(2);
     });
   });
+
+  it("clears previous error immediately when retrying", async () => {
+    let resolveRetry: ((response: Response) => void) | null = null;
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response("bad", { status: 500 }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveRetry = resolve;
+          })
+      );
+
+    const { result } = renderHook(() => useDailyDigest());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.error).toBe("Unable to load daily digest");
+
+    act(() => {
+      result.current.refresh();
+    });
+
+    expect(result.current.loading).toBe(true);
+    expect(result.current.error).toBeNull();
+
+    if (!resolveRetry) {
+      throw new Error("Retry request was not started");
+    }
+
+    const resolveRetryRequest = resolveRetry as (response: Response) => void;
+
+    await act(async () => {
+      resolveRetryRequest(
+        new Response(JSON.stringify(createDigest()), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.error).toBeNull();
+  });
 });

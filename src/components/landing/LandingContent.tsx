@@ -41,6 +41,7 @@ export function LandingContent() {
   const [threadsError, setThreadsError] = useState<string | null>(null);
 
   const fetchThreads = useCallback(async () => {
+    setThreadsError(null);
     setThreadsLoading(true);
 
     try {

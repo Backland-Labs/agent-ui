@@ -24,6 +24,7 @@ export function useDailyDigest(): UseDailyDigestReturn {
     abortRef.current = controller;
 
     try {
+      setError(null);
       setLoading(true);
       const response = await fetch("/api/digest", { signal: controller.signal });
 
