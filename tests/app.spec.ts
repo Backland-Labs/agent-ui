@@ -55,15 +55,14 @@ test.describe("Thread creation and messaging", () => {
     await page.getByRole("button", { name: /New Thread/i }).click();
 
     // The dialog should appear with "New conversation" title
-    await expect(page.getByText("New conversation")).toBeVisible({
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: "New conversation" })).toBeVisible({
       timeout: 5000,
     });
 
     // The select should already default to the first agent (Mock Assistant).
     // Open the select and choose Mock Assistant to be explicit.
-    const selectTrigger = page
-      .locator('[role="dialog"]')
-      .locator("button", { hasText: /Mock Assistant|Select an agent/i });
+    const selectTrigger = dialog.locator("button", { hasText: /Mock Assistant|Select an agent/i });
     await selectTrigger.click();
     await page.getByRole("option", { name: /Mock Assistant/i }).click();
 
@@ -103,7 +102,7 @@ test.describe("Thread creation and messaging", () => {
     await page.getByRole("button", { name: "Send message" }).click();
 
     // The user message should appear
-    await expect(page.getByText("Hello")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Hello", { exact: true })).toBeVisible({ timeout: 5000 });
 
     // Wait for the assistant response to stream in.
     // The mock agent responds to "hello" with a predictable message.
@@ -126,8 +125,16 @@ test.describe("Thread creation and messaging", () => {
     await chatInput.fill("Hello");
     await page.getByRole("button", { name: "Send message" }).click();
 
-    // Wait for the full assistant response
+    // Wait for assistant response to start rendering
+    await expect(page.getByRole("button", { name: "Stop generation" })).toBeVisible({
+      timeout: 10000,
+    });
     await expect(page.getByText("Hello! I'm a mock AI assistant", { exact: false })).toBeVisible({
+      timeout: 15000,
+    });
+
+    // Wait for stream completion so assistant message persistence has finished
+    await expect(page.getByRole("button", { name: "Stop generation" })).toBeHidden({
       timeout: 15000,
     });
 
@@ -136,7 +143,7 @@ test.describe("Thread creation and messaging", () => {
     await page.waitForLoadState("networkidle");
 
     // Messages should still be visible after reload (loaded from DB)
-    await expect(page.getByText("Hello")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("Hello", { exact: true })).toBeVisible({ timeout: 10000 });
     await expect(page.getByText("Hello! I'm a mock AI assistant", { exact: false })).toBeVisible({
       timeout: 10000,
     });
@@ -158,7 +165,7 @@ test.describe("Inbox functionality", () => {
     await expect(threadLink).toBeVisible({ timeout: 10000 });
 
     // The thread item should display the agent name
-    await expect(page.getByText("Mock Assistant")).toBeVisible({
+    await expect(threadLink.getByText("Mock Assistant")).toBeVisible({
       timeout: 10000,
     });
   });

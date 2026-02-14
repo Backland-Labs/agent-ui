@@ -10,6 +10,15 @@ export type Thread = InferSelectModel<typeof threads>;
 export type Message = InferSelectModel<typeof messages>;
 export type Run = InferSelectModel<typeof runs>;
 
+// Landing page types
+export type {
+  DailyDigestMetric,
+  DigestItem,
+  DigestAgentRollup,
+  DailyDigest,
+  LandingInboxThreadPreview,
+} from "./landing.types";
+
 // Denormalized inbox thread (result of threads JOIN agents + last message)
 export interface InboxThread {
   id: string;

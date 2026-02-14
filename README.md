@@ -36,18 +36,19 @@ Agents are defined in `agents.config.json` at the project root. Each entry has a
 
 ## Scripts
 
-| Command                 | Description                       |
-| ----------------------- | --------------------------------- |
-| `bun dev`               | Start Next.js dev server          |
-| `bun run build`         | Production build                  |
-| `bun run lint`          | ESLint                            |
-| `bun run format`        | Format all files with Prettier    |
-| `bun run format:check`  | Check formatting (CI)             |
-| `bun run typecheck`     | Type-check without emitting       |
-| `bun run test`          | Run unit tests (Vitest)           |
-| `bun run test:watch`    | Run unit tests in watch mode      |
-| `bun run test:coverage` | Run unit tests with coverage      |
-| `bunx playwright test`  | Run end-to-end tests (Playwright) |
+| Command                                                   | Description                                         |
+| --------------------------------------------------------- | --------------------------------------------------- |
+| `bun dev`                                                 | Start Next.js dev server                            |
+| `bun run build`                                           | Production build                                    |
+| `bun run lint`                                            | ESLint                                              |
+| `bun run format`                                          | Format all files with Prettier                      |
+| `bun run format:check`                                    | Check formatting (CI)                               |
+| `bun run typecheck`                                       | Type-check without emitting                         |
+| `bun run test`                                            | Run unit tests (Vitest)                             |
+| `bun run test:watch`                                      | Run unit tests in watch mode                        |
+| `bun run test:coverage`                                   | Run unit tests with coverage                        |
+| `bun run opencode:append-thread [pr-number] [session-id]` | Post session transcript to a PR as a marked comment |
+| `bunx playwright test`                                    | Run end-to-end tests (Playwright)                   |
 
 ## Architecture
 

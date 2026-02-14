@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Inbox } from "lucide-react";
+import { Inbox, House } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -69,6 +69,14 @@ export function AgentSidebar({ agents }: AgentSidebarProps) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/"}>
+                  <Link href="/">
+                    <House className="h-4 w-4" />
+                    <span>Today</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === "/inbox"}>
                   <Link href="/inbox">
