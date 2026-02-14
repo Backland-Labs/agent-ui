@@ -96,9 +96,11 @@ export function LandingCalendarCard({
               <p className="text-[11px] text-muted-foreground/60 mt-1">
                 {event.isAllDay ? "All day" : `${formatTime(event.startTime)} • ${event.account}`}
               </p>
-              <p className="text-[10px] font-mono text-muted-foreground/45 mt-0.5">
-                Starts {formatRelativeTime(event.startTime)}
-              </p>
+              {!event.isAllDay && (
+                <p className="text-[10px] font-mono text-muted-foreground/45 mt-0.5">
+                  Starts {formatRelativeTime(event.startTime)}
+                </p>
+              )}
             </a>
           ))}
         </div>
