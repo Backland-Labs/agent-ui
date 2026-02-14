@@ -1,189 +1,154 @@
 # AGENTS
 
-Use this document as repo-specific guidance for all coding agents working in
-`/Users/max/code/agent-ui`.
+Use this file as repo-specific operational guidance for coding agents working in this project.
 
-## 1) Scope and stack overview
+## 1) Scope and purpose
 
-- Project: Agent UI built with Next.js 16 App Router and React 19.
-- Language/runtime: TypeScript 5 with Bun for scripts, install, test, and lint workflows.
-- Data layer: `drizzle-orm` + `@libsql/client` (libSQL/Turso).
-- Agent orchestration surface: AG-UI via CopilotKit route and local client state.
-- UI system: shadcn/ui + Radix primitives, with existing `src` references removed from this workspace.
+- Primary stack: Next.js 16 (App Router), React 19, TypeScript 5, Bun.
+- Persistence: libSQL/Turso via `@libsql/client` + `drizzle-orm`.
+- Runtime surface: AG-UI protocol route (`/api/copilotkit`) and CopilotKit-backed UI.
+- Testing stack: Vitest + Testing Library for unit, Playwright for e2e.
 
-## 2) Required project commands
+## 2) Commands to know
 
-- `bun dev` starts local app with Turbopack and pino-pretty logs.
-- `bun run build` compiles production bundle.
-- `bun run lint` runs ESLint.
-- `bun run format` runs Prettier over the repository.
-- `bun run format:check` validates formatting.
-- `bun run typecheck` runs TypeScript checks with `tsc --noEmit`.
-- `bun run test` runs `vitest run` on all unit tests.
-- `bun run test:watch` runs Vitest in watch mode.
-- `bun run test:coverage` runs tests with coverage reporting.
-- `bun run db:generate` regenerates migration metadata.
-- `bun run db:migrate` runs migration script.
-- `bun run db:push` pushes schema updates.
+- `bun dev` starts the app on port 3000 using Next dev server + log pretty-printer.
+- `bun run build` compiles production output.
+- `bun run lint` runs ESLint checks.
+- `bun run format` applies Prettier across the repo.
+- `bun run format:check` verifies formatting (CI equivalent).
+- `bun run typecheck` runs `tsc --noEmit`.
+- `bun run test` runs all unit tests (`vitest run`).
+- `bun run test:watch` runs unit tests in watch mode.
+- `bun run test:coverage` runs tests and generates coverage artifacts.
+- `bun run db:generate` regenerates Drizzle migration SQL metadata.
+- `bun run db:migrate` runs local migration script.
+- `bun run db:push` pushes schema to remote/database target.
 - `bun run db:studio` opens Drizzle Studio.
-- `bunx playwright test` runs E2E suite.
-- `bun run opencode:append-thread <pr-number> <session-id>` posts an opencode session thread.
+- `bunx playwright test` runs Playwright suite.
 
-### 2.1) Targeted test commands
+### Helpful one-off test runs
 
-- Single test by name:
-  `bun run test -t "loads initial threads"`.
-- Single Playwright run: `bunx playwright test`.
-- Single Playwright title: `bunx playwright test -g "creates thread"`.
+- Single Vitest file: `bun run test src/lib/hooks/__tests__/useAgentChat.test.ts`.
+- Single test name:
+  `bun run test src/app/api/threads/__tests__/route.test.ts -t "creates a new thread"`.
+- Single Playwright file: `bunx playwright test tests/app.spec.ts`.
+- Single Playwright title:
+  `bunx playwright test -g "login"`.
 
-Note: `src/` and `tests/` are removed in this workspace snapshot.
+### CI expectations
 
-### 2.2) CI-equivalent baseline
+- CI runs `bun run typecheck`, `bun run lint`, `bun run format:check`, `bun run build`, and `bun run test:coverage`.
 
-- CI runs, in order, `bun run typecheck`, `bun run lint`, `bun run format:check`,
-  `bun run build`, and `bun run test:coverage`.
-- Local changes intended for PR should run this same set before large merges.
+## 3) Critical files and conventions to follow
 
-## 3) Instruction hierarchy
+- App routes are in `src/app/**/route.ts`.
+- Shared UI is in `src/components/**`.
+- Data and utilities are in `src/lib/**`.
+- DB schema and client code in `db/**`.
+- Agent definitions live in `agents.config.json`.
+- Public-facing setup and scripts in `README.md` and `CLAUDE.md`.
 
-- Prioritize: system prompt > repository-level instructions (`CLAUDE.md`) > `AGENTS.md`.
-- If future `.cursor/rules`, `.cursorrules`, or `.github/copilot-instructions.md` appear,
-  they override this file for the scope they define.
-- At present, no such files exist in this repository.
+## 4) Core coding conventions
 
-## 4) Files and architecture map
+- Use TypeScript strict style; keep explicit typing when behavior is non-trivial.
+- Export only necessary symbols; prefer named exports unless module semantics require default.
+- Prefer early returns for guard clauses and explicit error handling.
+- Keep functions small and single-purpose; route handlers should be thin and delegate to helpers.
+- Use `type` aliases for DB schema-driven structures when readability improves inference.
+- Prefer `const` with clear object/array typing over `any`.
+- Don’t use `console.log` for diagnostics; use logger utilities where available.
+- Keep comments minimal and only for non-obvious intent.
 
-- `db/**`: schema, client, migration metadata, and migration scripts.
-- `scripts/**`: repo maintenance and automation scripts.
-- `docs/**`: design notes, plans, and implementation notes.
-- `agents.config.json`: agent endpoint registry and metadata.
-- `README.md`: runbooks and architecture summary.
+## 5) API and route patterns
 
-## 5) Core coding conventions
+- Keep `route.ts` with explicit verb exports (`GET`, `POST`, etc.).
+- Extract business logic into `handleXxx(...)` helpers that accept optional injected `db` values.
+  - Existing pattern: `handleGetThreads(db = defaultDb, ...)`.
+- Keep request parsing and validation inside route wrapper (`GET`, `POST`, etc.) or shared helper.
+- Return `NextResponse.json(payload, { status })` for all API responses.
+- Use explicit not-found/bad-input statuses (`400`, `404`, etc.) with concise `error` strings.
+- For complex queries, keep transformation from DB shape to API shape in dedicated mapping object.
 
-- Use strict TypeScript; prefer concrete types over implicit `any`.
-- Use `type` for object/shape aliases, `interface` when extending object-oriented patterns.
-- Keep route handlers small; move reusable logic into helper functions where possible.
-- Use early returns for validation and guard clauses.
-- Keep side effects near entrypoints (routes, hooks, effects), and pure transforms in helper functions.
-- Use `const` for immutable bindings unless mutation is explicitly needed.
-- Export named symbols unless a file is strongly single-purpose default export.
-- Avoid "clever" one-liners; prefer explicit code paths the next agent can read quickly.
+## 6) Database and query standards
 
-## 6) Import and module ordering
+- Import Drizzle schema from `db/schema` and use typed queries.
+- Build and use helper seed/fixtures only in tests; avoid test-only assumptions in production code.
+- Use local helper default DB injection in route handlers for testability.
+- Avoid embedding SQL text strings unless existing ORM pattern justifies it.
+- Never hardcode production credentials in code; always read from env vars.
+- Be careful with `Date` serialization/deserialization in API responses; keep explicit conversions as needed.
 
-- Prefer external imports first.
-- Then alias imports from `@/`.
-- Then relative imports.
-- Keep import groups separated by a blank line.
-- Use absolute imports for app code where practical (`@/...`) to avoid long relative chains.
-- Delete unused imports immediately; do not suppress with comments.
+## 7) Component patterns
 
-## 7) Formatting and lint conventions
+- Use the project’s import ordering convention: external imports first, alias imports (`@/...`) next.
+- Components should be function components using hooks and explicit props interfaces.
+- Keep UI composition small and reusable; prefer extracting repeated UI fragments.
+- Use existing shadcn/ui primitives in `src/components/ui` where applicable.
+- For client components, include `"use client"` only where browser APIs/hooks are required.
 
-- Use existing Prettier settings from `.prettierrc` (`printWidth: 100`, `trailingComma: es5`).
-- Keep lines readable; refactor when format indicates unclear structure.
-- Keep semantically related utility functions together in modules.
-- Do not manually format with custom styles that fight ESLint/Prettier.
-- Run `bun run lint` and `bun run format` after manual edits in touched files.
+## 8) Testing requirements
 
-## 8) Error handling and responses
+- Add or update tests whenever behavior changes.
+- Unit test APIs by invoking route handlers directly where possible (`handleXxx` + optional DB injection).
+- Add wrapper tests for route wiring/params/status code behavior when route boundaries are important.
+- In tests, prefer mock-friendly in-memory DB setup helpers and deterministic seeds.
+- Use `vi.spyOn` for fetch behavior and restore mocks in teardown (`afterEach`).
+- Keep assertions on both shape and status codes when touching API responses.
+- For streaming/async hooks, use `waitFor`, `act`, and event loop-aware assertions.
 
-- In `route.ts`, use explicit status codes for bad input and domain errors:
-  `400`, `404`, `409`, and `500` when appropriate.
-- Return stable payload keys: e.g. `{ error: "..." }` for failures, structured success payloads for success.
-- Validate request data before DB writes.
-- Keep user-facing error text high level; avoid returning raw internal stack traces.
-- Prefer `try/catch` around async operations and log with non-sensitive context.
+## 9) New feature workflow
 
-## 9) Route and API patterns
+- 1. Implement change in smallest coherent unit (route/lib/component).
+- 2. Add or update tests before finalizing behavior.
+- 3. Run: `bun run lint`, `bun run typecheck`, and focused test file at least.
+- 4. Run full checks before large merges (`bun run test:coverage` + `bun run build`) if touched areas are broad.
 
-- Exports should use Next App Router verbs (`GET`, `POST`, etc.).
-- Keep parsing/validation near boundary, and business logic in injected helpers.
-- For DB-dependent logic, allow optional injection of default DB context for testability.
-- Map DB rows to API DTOs in explicit conversion helpers.
-- Preserve existing conventions for thread routes and agent endpoints.
+## 10) Files to avoid modifying unnecessarily
 
-## 10) Database standards
+- Prefer not to touch unrelated files unless required by the task.
+- Do not touch migration-generated artifacts without explicit need.
+- Respect existing patterns instead of broad refactors.
 
-- Read/write through Drizzle query builders rather than ad-hoc string SQL where possible.
-- Keep migration files focused and avoid manual edits unless required by schema changes.
-- Never hardcode environment secrets or tokens.
-- Use named parameters / explicit filters to avoid accidental broad writes.
-- Treat `Date` values carefully in serialization paths; ensure UTC consistency where possible.
+## 11) Environment and secrets
 
-## 11) Component patterns
+- `.env` / `.env.local` are local; never embed secrets in code or commit them.
+- Required local envs: `TURSO_DATABASE_URL`, optional `TURSO_AUTH_TOKEN`.
+- Optional integrations use Google OAuth credentials (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, etc.).
+- If adding/using env vars, update `.env.example` and relevant docs.
 
-- Use function components with explicit props typings.
-- Mark client components with `"use client"` only when needed.
-- Keep component props minimal and predictable.
-- Favor composition over deep prop drilling.
-- Use existing `ui` primitives to stay consistent with style and accessibility behavior.
-- Keep hooks inside components only, and avoid conditional hooks.
+## 12) Logging and error behavior
 
-## 12) Testing expectations
+- Keep logs structured and non-noisy; avoid logging sensitive user inputs.
+- Return user-safe errors in API endpoints; avoid leaking raw internal details.
+- Ensure loading/error states are surfaced in UI components and cleaned up on completion.
 
-- Add or update tests for changed behavior.
-- Test route contracts (status, body shape) as well as happy path.
-- Prefer deterministic seeds and local fixtures in DB-related tests.
-- Use focused assertions for async state transitions.
-- Keep coverage meaningful; avoid brittle selectors in component tests.
-- Mock external services with local test stubs; keep tests resilient to network variance.
+## 13) Directory and config checks this repo expects
 
-## 13) Test file placement and naming
+- No `.cursor/rules`, `.cursorrules`, or `.github/copilot-instructions.md` currently exist.
+- If any future agent instructions appear in those locations, treat them as higher priority local instructions.
 
-- Unit test files should use `.test.ts`/`.test.tsx`.
-- Route tests under `**/__tests__/` or matching directory conventions.
-- Keep test description strings concrete and aligned with business behavior.
-- Co-locate tests near implementation when they are specific and stable.
+## 14) Suggested PR hygiene
 
-## 14) Logging and observability
+- Mention command outputs (`lint`, `typecheck`, tests) in summary.
+- Provide concise rationale for logic changes in code review comments.
+- If test additions are added, include coverage implications and any skipped areas.
 
-- Prefer existing logger patterns (Pino) over raw logs.
-- Log failure causes with context enough to reproduce while avoiding sensitive payloads.
-- Keep logs concise and structured JSON-like key-value pairs.
-- Avoid logging full request bodies when they can contain tokens, credentials, or PII.
+## 15) Practical style notes
 
-## 15) Naming standards
+- Prefer `await` with `async` handlers over chained promises for readability.
+- Keep magic strings in constants or enums when repeated.
+- Use descriptive variable names for IDs and route params (`threadId`, `agentId`).
+- For arrays/lists, avoid mutating input objects; use functional updates.
+- Keep imports sorted and avoid dead imports; lint will enforce many of these.
 
-- Use descriptive identifiers: `threadId`, `agentId`, `messageInput`, `copilotPayload`.
-- Avoid abbreviations unless standard (`id`, `db`, `url`).
-- Use verb-noun names for handlers: `fetchThreads`, `createThread`, `transformThreadRow`.
-- Constants should communicate intent (`MAX_THREADS_PER_PAGE`, `DEFAULT_POLL_INTERVAL_MS`).
+## 16) Git workflow expectations (when requested)
 
-## 16) Work discipline
+- Do not amend commits unless explicitly requested and safe by context.
+- Avoid destructive git operations.
+- If creating commits, keep messages concise and intent-focused.
 
-- Start with smallest possible coherent change.
-- Keep PR scope tightly related to the ticket/request.
-- Do not perform broad refactors unless explicitly requested.
-- Leave unrelated formatting-only churn out unless file formatting must change.
-- If behavior is uncertain, inspect existing tests before touching core logic.
+## 17) Runbook reminders
 
-## 17) Environment and configuration
-
-- Use `.env.local` for local secrets and `bun dev` assumptions.
-- For Turso production setup, keep `TURSO_DATABASE_URL` and optional
-  `TURSO_AUTH_TOKEN` outside the source tree.
-- If adding env vars, update `README.md` and `.env.example` where appropriate.
-- Never commit credentials, `.env` files, or personal tokens.
-
-## 18) Security and safety
-
-- Validate external input before DB access and outbound requests.
-- Use allow-listed transformations before presenting user data.
-- Avoid creating SQL/command injection surfaces by direct concatenation.
-- Review access checks when adding new authenticated paths.
-
-## 19) PR and reporting expectations
-
-- Include explicit command evidence (lint/typecheck/test) in PR notes.
-- Mention schema or migration impact clearly.
-- Note any skipped checks and why.
-- Keep summaries short, outcome-focused, and reviewer-friendly.
-
-## 20) Practical workflow reminders
-
-- Do not amend commits unless explicitly requested.
-- Do not use destructive git operations unless the user asks for them.
-- Prefer incremental delivery and narrow PRs.
-- If an instruction conflicts with current repository conventions, follow existing local patterns.
+- Start with targeted changes and tests, then broaden.
+- If unknown behavior appears, check related tests first before changing logic.
+- If uncertain, prefer smallest diff consistent with existing route and test patterns.

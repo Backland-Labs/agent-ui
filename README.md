@@ -30,10 +30,6 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-Note: This repository snapshot does not include `src/` or `tests/` directories.
-
-Those directories have been removed by request, so this README is focused on configuration, scripts, and docs instead of in-tree application routes/components.
-
 ## Agent Configuration
 
 Agents are defined in `agents.config.json` at the project root. Each entry has an `id`, `name`, `endpoint_url` (AG-UI protocol endpoint), and `description`. To add a new agent, add an entry to this file.
@@ -66,15 +62,27 @@ Agents are defined in `agents.config.json` at the project root. Each entry has a
 ### Key Directories
 
 ```
+src/
+  components/
+    inbox/       -- Inbox list, filtering, thread previews
+    thread/      -- Chat UI (MessageList, MessageBubble, ChatInput)
+    sidebar/     -- Agent list sidebar, new thread dialog
+    providers/   -- AppLayout root client component
+    ui/          -- shadcn/ui primitives
+  lib/
+    agents/      -- Agent config loading and types
+    hooks/       -- Data hooks (useInbox, useMessages)
+  types/         -- Database types
 db/              -- Turso/libSQL client, schema, and migrations
-scripts/         -- Repository maintenance and automation scripts
-docs/            -- Design notes, plans, and implementation notes
-public/          -- Static assets
 ```
 
 ### Routes
 
-- Source routes are not present in this snapshot.
+- `/` -- redirects to `/inbox`
+- `/inbox` -- Thread list (all or filtered by agent)
+- `/thread/[id]` -- Individual thread chat view
+- `/api/copilotkit` -- AG-UI protocol endpoint (POST)
+- `/api/mock-agent` -- Test agent endpoint
 
 ### Tech Stack
 
