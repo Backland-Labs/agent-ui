@@ -7,10 +7,16 @@
       "description": "A mock agent for testing the UI"
     },
     {
-      "id": "claude-coder",
-      "name": "Claude Coder",
-      "endpoint_url": "http://localhost:8001/agui",
-      "description": "Coding assistant powered by Claude"
+      "id": "email-agent",
+      "name": "Email Agent",
+      "endpoint_url": "http://email-agent.railway.internal:3001/agent",
+      "description": "Email assistant for mailbox-related tasks"
+    },
+    {
+      "id": "gmail-insights-agent",
+      "name": "Gmail Insights Agent",
+      "endpoint_url": "http://localhost:3001/agent",
+      "description": "Reads unread Gmail and streams structured insights"
     }
   ]
 }
