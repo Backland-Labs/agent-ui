@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev --turbopack | bunx pino-pretty",
     "build": "next build",
-    "start": "next start",
+    "start": "bun run scripts/start-production.ts",
+    "start:next": "next start",
     "lint": "eslint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
