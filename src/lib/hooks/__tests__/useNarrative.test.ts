@@ -124,6 +124,35 @@ describe("useNarrative", () => {
     expect(result.current.refreshError).toBe("Unable to load email narrative");
   });
 
+  it("transitions to terminal_error on 404 during refresh even with prior data", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        buildOkResponse({
+          items: [buildNarrativeItem("thread-1")],
+        })
+      )
+      .mockResolvedValueOnce(new Response("missing", { status: 404 }));
+
+    const { result } = renderHook(() => useNarrative());
+
+    await waitFor(() => {
+      expect(result.current.state).toBe("success");
+    });
+
+    act(() => {
+      result.current.refresh();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isRefreshing).toBe(false);
+    });
+
+    expect(result.current.state).toBe("terminal_error");
+    expect(result.current.narratives).toEqual([]);
+    expect(result.current.error).toBe("Email narrative source unavailable");
+    expect(result.current.refreshError).toBeNull();
+  });
+
   it("keeps latest refresh result when earlier request resolves later", async () => {
     const requestA = createDeferredResponse();
     const requestB = createDeferredResponse();

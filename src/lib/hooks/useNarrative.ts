@@ -84,7 +84,7 @@ export function useNarrative(): UseNarrativeReturn {
         if (!response.ok) {
           const mappedError = getErrorMessage(response.status);
 
-          if (isRefreshRequest) {
+          if (isRefreshRequest && response.status !== 404) {
             setRefreshError(mappedError);
           } else {
             setNarratives([]);
