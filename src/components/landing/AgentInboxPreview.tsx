@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { RefreshCw, MailOpen } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import type { LandingInboxThreadPreview } from "@/types";
+import type { LandingNarrativeItem, LandingNarrativeState } from "@/types";
 
 interface AgentInboxPreviewProps {
-  threads: LandingInboxThreadPreview[];
-  loading: boolean;
-  error: string | null;
+  items: LandingNarrativeItem[];
+  state: LandingNarrativeState;
+  terminalError: string | null;
+  refreshError: string | null;
+  isRefreshing: boolean;
   refresh: () => void;
 }
 
@@ -37,50 +39,77 @@ function ThreadSkeleton() {
   );
 }
 
-export function AgentInboxPreview({ threads, loading, error, refresh }: AgentInboxPreviewProps) {
+function isValidThreadId(item: LandingNarrativeItem): boolean {
+  return item.threadId.trim().length > 0;
+}
+
+export function AgentInboxPreview({
+  items,
+  state,
+  terminalError,
+  refreshError,
+  isRefreshing,
+  refresh,
+}: AgentInboxPreviewProps) {
+  const threadItems = items.filter(isValidThreadId);
+
   return (
     <section className="rounded-xl border border-border/30 bg-card/60 flex-1 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Inbox Preview</h2>
+          <h2 className="text-sm font-semibold text-foreground">Email Narrative</h2>
           <p className="font-mono text-[10px] text-muted-foreground/65">
-            Top threads from this morning
+            Recent thread summaries from the email agent
           </p>
         </div>
         <button
           onClick={refresh}
           type="button"
+          disabled={state === "initial_loading" || isRefreshing}
           className="flex items-center gap-1 text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors"
         >
-          <RefreshCw className="h-3 w-3" />
-          Refresh
+          <RefreshCw className={isRefreshing ? "h-3 w-3 animate-spin" : "h-3 w-3"} />
+          {isRefreshing ? "Refreshing..." : "Refresh"}
         </button>
       </div>
 
-      {loading && !error ? <ThreadSkeleton /> : null}
-      {loading && !error ? (
-        <p className="mt-2 text-xs text-muted-foreground/60">Loading inbox preview...</p>
-      ) : null}
-
-      {error ? (
-        <div className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          {error}
+      {refreshError ? (
+        <div className="mb-3 flex items-center justify-between rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <span>{refreshError}</span>
+          <button
+            onClick={refresh}
+            type="button"
+            className="font-medium text-destructive/90 hover:text-destructive transition-colors"
+          >
+            Retry
+          </button>
         </div>
       ) : null}
 
-      {!loading && !error && threads.length === 0 ? (
+      {state === "initial_loading" ? <ThreadSkeleton /> : null}
+      {state === "initial_loading" ? (
+        <p className="mt-2 text-xs text-muted-foreground/60">Loading email narrative...</p>
+      ) : null}
+
+      {state === "terminal_error" && terminalError ? (
+        <div className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {terminalError}
+        </div>
+      ) : null}
+
+      {state === "empty" ? (
         <div className="flex flex-col items-center justify-center rounded-md border border-border/20 bg-accent/10 py-8 text-center px-2">
           <MailOpen className="h-5 w-5 text-muted-foreground/40 mb-2" />
           <p className="text-xs text-muted-foreground/60">All caught up.</p>
           <p className="text-[11px] text-muted-foreground/50 mt-1">
-            No recent threads in the last 24 hours.
+            No recent items to triage from the email agent.
           </p>
         </div>
       ) : null}
 
-      {!loading && !error && threads.length > 0 ? (
+      {state === "success" && threadItems.length > 0 ? (
         <div className="space-y-0">
-          {threads.map((thread, index) => (
+          {threadItems.map((thread, index) => (
             <Link
               key={thread.threadId}
               href={`/thread/${thread.threadId}`}

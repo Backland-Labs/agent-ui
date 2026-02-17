@@ -17,6 +17,9 @@ export type {
   DigestAgentRollup,
   DailyDigest,
   LandingInboxThreadPreview,
+  LandingNarrativeItem,
+  LandingNarrativeResponse,
+  LandingNarrativeState,
 } from "./landing.types";
 
 // Denormalized inbox thread (result of threads JOIN agents + last message)
