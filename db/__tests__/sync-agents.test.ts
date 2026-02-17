@@ -36,6 +36,7 @@ describe("syncAgentsToDb", () => {
       expect(match).toBeDefined();
       expect(match!.name).toBe(agentConfig.name);
       expect(match!.endpoint_url).toBe(agentConfig.endpoint_url);
+      expect(match!.api_docs).toBe(agentConfig.api_docs ?? null);
       expect(match!.description).toBe(agentConfig.description ?? null);
       expect(match!.icon).toBe(agentConfig.icon ?? null);
     }
@@ -60,10 +61,11 @@ describe("syncAgentsToDb", () => {
       id: firstAgent.id,
       name: "Old Name",
       endpoint_url: "http://old-url:8000",
+      api_docs: "http://old-url:8000/docs",
       description: "Old description",
     });
 
-    // Sync should update the name, endpoint_url, and description
+    // Sync should update changed config fields
     await syncAgentsToDb(db);
 
     const [updated] = await db
@@ -73,6 +75,7 @@ describe("syncAgentsToDb", () => {
 
     expect(updated.name).toBe(firstAgent.name);
     expect(updated.endpoint_url).toBe(firstAgent.endpoint_url);
+    expect(updated.api_docs).toBe(firstAgent.api_docs ?? null);
     expect(updated.description).toBe(firstAgent.description ?? null);
   });
 

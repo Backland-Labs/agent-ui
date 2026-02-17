@@ -4,18 +4,21 @@
       "id": "mock-assistant",
       "name": "Mock Assistant",
       "endpoint_url": "http://localhost:3000/api/mock-agent",
+      "api_docs": "http://localhost:3000/api/mock-agent/docs",
       "description": "A mock agent for testing the UI"
     },
     {
       "id": "email-agent",
       "name": "Email Agent",
       "endpoint_url": "http://email-agent.railway.internal:3001/agent",
+      "api_docs": "http://email-agent.railway.internal:3001/api-docs.json",
       "description": "Email assistant for mailbox-related tasks"
     },
     {
       "id": "gmail-insights-agent",
       "name": "Gmail Insights Agent",
       "endpoint_url": "http://localhost:3001/agent",
+      "api_docs": "http://localhost:3001/docs",
       "description": "Reads unread Gmail and streams structured insights"
     }
   ]

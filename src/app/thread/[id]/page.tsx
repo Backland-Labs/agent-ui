@@ -46,6 +46,7 @@ export default async function ThreadPage({ params }: ThreadPageProps) {
               id: agent.id,
               name: agent.name,
               endpoint_url: agent.endpoint_url,
+              api_docs: agent.api_docs ?? undefined,
               icon: agent.icon ?? undefined,
               description: agent.description ?? undefined,
             }}

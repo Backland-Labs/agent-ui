@@ -6,6 +6,7 @@ import { syncAgentsToDb } from "../../db/sync-agents";
 import { db } from "../../db/client";
 import { agents } from "../../db/schema";
 import { loadAgentsConfig } from "@/lib/agents";
+import type { AgentConfig } from "@/lib/agents";
 import { logger } from "@/lib/server/logger";
 
 const instrumentSerif = Instrument_Serif({
@@ -38,13 +39,7 @@ export default async function RootLayout({
   // Sync agents from config to DB and load from DB.
   // Falls back to the static config file when the DB is unavailable
   // (e.g. during next build prerendering before migrations have run).
-  let agentConfigs: {
-    id: string;
-    name: string;
-    endpoint_url: string;
-    icon?: string;
-    description?: string;
-  }[];
+  let agentConfigs: AgentConfig[];
   try {
     await syncAgentsToDb();
     const dbAgents = await db.select().from(agents);
@@ -52,6 +47,7 @@ export default async function RootLayout({
       id: a.id,
       name: a.name,
       endpoint_url: a.endpoint_url,
+      api_docs: a.api_docs ?? undefined,
       icon: a.icon ?? undefined,
       description: a.description ?? undefined,
     }));
@@ -61,6 +57,7 @@ export default async function RootLayout({
       id: a.id,
       name: a.name,
       endpoint_url: a.endpoint_url,
+      api_docs: a.api_docs ?? undefined,
       icon: a.icon ?? undefined,
       description: a.description ?? undefined,
     }));

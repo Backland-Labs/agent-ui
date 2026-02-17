@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db as defaultDb } from "../../../../../../db/client";
 import { agents } from "../../../../../../db/schema";
+import { syncAgentsToDb } from "../../../../../../db/sync-agents";
 import { logger } from "@/lib/server/logger";
 
 type Db = typeof defaultDb;
 
 interface HealthCheckOptions {
   timeoutMs?: number;
+}
+
+function isMethodUnsupported(status: number): boolean {
+  return status === 405 || status === 501;
 }
 
 export async function handleHealthCheck(
@@ -35,7 +40,7 @@ export async function handleHealthCheck(
     });
 
     clearTimeout(timeoutId);
-    isOnline = response.ok;
+    isOnline = response.ok || isMethodUnsupported(response.status);
   } catch (error) {
     logger.debug({ event: "health.check_failed", agentId, err: error }, "health check failed");
     isOnline = false;
@@ -64,6 +69,7 @@ export async function handleHealthCheck(
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  await syncAgentsToDb(defaultDb);
   const { id } = await params;
   return handleHealthCheck(id, defaultDb);
 }

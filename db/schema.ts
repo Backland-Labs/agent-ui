@@ -4,6 +4,7 @@ export const agents = sqliteTable("agents", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   endpoint_url: text("endpoint_url").notNull(),
+  api_docs: text("api_docs"),
   icon: text("icon"),
   description: text("description"),
   status: text("status", { enum: ["online", "offline", "unknown"] })

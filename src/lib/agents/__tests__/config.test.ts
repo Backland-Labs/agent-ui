@@ -19,6 +19,15 @@ describe("loadAgentsConfig", () => {
       expect(typeof agent.endpoint_url).toBe("string");
     }
   });
+
+  it("supports optional api_docs when present", () => {
+    const agents = loadAgentsConfig();
+    for (const agent of agents) {
+      if (agent.api_docs !== undefined) {
+        expect(typeof agent.api_docs).toBe("string");
+      }
+    }
+  });
 });
 
 describe("getAgentById", () => {

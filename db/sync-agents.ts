@@ -11,6 +11,7 @@ export async function syncAgentsToDb(db = defaultDb) {
         id: agent.id,
         name: agent.name,
         endpoint_url: agent.endpoint_url,
+        api_docs: agent.api_docs ?? null,
         icon: agent.icon ?? null,
         description: agent.description ?? null,
       })
@@ -19,6 +20,7 @@ export async function syncAgentsToDb(db = defaultDb) {
         set: {
           name: agent.name,
           endpoint_url: agent.endpoint_url,
+          api_docs: agent.api_docs ?? null,
           icon: agent.icon ?? null,
           description: agent.description ?? null,
           updated_at: new Date(),

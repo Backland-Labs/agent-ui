@@ -40,6 +40,7 @@ describe("syncAgentsToDb nullish branches", () => {
       .from(schema.agents)
       .where(eq(schema.agents.id, "agent-nullish"));
     expect(inserted[0]).toMatchObject({
+      api_docs: null,
       description: null,
       icon: null,
     });
@@ -58,6 +59,7 @@ describe("syncAgentsToDb nullish branches", () => {
       .from(schema.agents)
       .where(eq(schema.agents.id, "agent-nullish"));
 
+    expect(updated[0].api_docs).toBeNull();
     expect(updated[0].description).toBeNull();
     expect(updated[0].name).toBe("Agent Nullish Updated");
     expect(updated[0].endpoint_url).toBe("http://localhost:4001/agent");

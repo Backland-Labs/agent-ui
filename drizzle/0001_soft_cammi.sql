@@ -1,0 +1,1 @@
+ALTER TABLE `agents` ADD `api_docs` text;

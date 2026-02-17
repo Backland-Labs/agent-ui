@@ -32,7 +32,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Agent Configuration
 
-Agents are defined in `agents.config.json` at the project root. Each entry has an `id`, `name`, `endpoint_url` (AG-UI protocol endpoint), and `description`. To add a new agent, add an entry to this file.
+Agents are defined in `agents.config.json` at the project root. Each entry has an `id`, `name`, `endpoint_url` (AG-UI protocol endpoint), optional `api_docs` URL, and `description`. To add a new agent, add an entry to this file.
 
 ## Scripts
 

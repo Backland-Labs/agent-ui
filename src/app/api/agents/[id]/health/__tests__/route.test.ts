@@ -77,6 +77,19 @@ describe("GET /api/agents/:id/health", () => {
     expect(data.status).toBe("offline");
   });
 
+  it("treats method not allowed responses as online", async () => {
+    const agent = await seedAgent(db);
+    fetchSpy.mockResolvedValueOnce(new Response("Method Not Allowed", { status: 405 }));
+
+    const response = await handleHealthCheck(agent.id, db);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.agentId).toBe(agent.id);
+    expect(data.status).toBe("online");
+    expect(data.lastSeenAt).toBeDefined();
+  });
+
   it("returns offline status when agent endpoint times out", async () => {
     const agent = await seedAgent(db);
     // Mock fetch to never resolve (simulating a timeout)

@@ -56,6 +56,7 @@ describe("schema — agents table", () => {
       id: "agent-1",
       name: "Test Agent",
       endpoint_url: "http://localhost:8000/agent",
+      api_docs: "http://localhost:8000/docs",
       icon: "bot",
       description: "A test agent",
       status: "online",
@@ -72,6 +73,7 @@ describe("schema — agents table", () => {
     expect(agent.id).toBe("agent-1");
     expect(agent.name).toBe("Test Agent");
     expect(agent.endpoint_url).toBe("http://localhost:8000/agent");
+    expect(agent.api_docs).toBe("http://localhost:8000/docs");
     expect(agent.icon).toBe("bot");
     expect(agent.description).toBe("A test agent");
     expect(agent.status).toBe("online");
@@ -130,6 +132,7 @@ describe("schema — agents table", () => {
       .where(eq(schema.agents.id, "agent-nulls"));
 
     expect(agent.icon).toBeNull();
+    expect(agent.api_docs).toBeNull();
     expect(agent.description).toBeNull();
     expect(agent.last_seen_at).toBeNull();
     expect(agent.config).toBeNull();
