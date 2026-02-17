@@ -133,4 +133,30 @@ describe("GET /api/threads wrappers", () => {
     expect(data.title).toBe("Posted Thread");
     expect(rows).toHaveLength(1);
   });
+
+  it("POST syncs agents from config before validating agentId", async () => {
+    const { POST } = await loadRoute();
+
+    const response = await POST(
+      new NextRequest("http://localhost:3000/api/threads", {
+        method: "POST",
+        body: JSON.stringify({
+          agentId: "email-agent",
+          title: "Config-backed Thread",
+        }),
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    const data = await response.json();
+
+    const syncedAgent = await testDb
+      .select()
+      .from(schema.agents)
+      .where(eq(schema.agents.id, "email-agent"))
+      .get();
+
+    expect(response.status).toBe(201);
+    expect(data.agent_id).toBe("email-agent");
+    expect(syncedAgent?.id).toBe("email-agent");
+  });
 });

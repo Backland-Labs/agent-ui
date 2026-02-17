@@ -31,11 +31,13 @@ export function NewThreadDialog({ agents }: NewThreadDialogProps) {
   const [selectedAgent, setSelectedAgent] = useState(agents[0]?.id || "");
   const [isOpen, setIsOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleCreate = async () => {
     if (!selectedAgent) return;
 
     setIsCreating(true);
+    setErrorMessage(null);
     try {
       const res = await fetch("/api/threads", {
         method: "POST",
@@ -46,20 +48,34 @@ export function NewThreadDialog({ agents }: NewThreadDialogProps) {
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to create thread");
+      if (!res.ok) {
+        const errorData = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(errorData?.error || "Failed to create thread");
+      }
 
       const thread = await res.json();
+
+      if (!thread?.id || typeof thread.id !== "string") {
+        throw new Error("Thread creation did not return a valid id");
+      }
+
       router.push(`/thread/${thread.id}`);
       setIsOpen(false);
-    } catch {
-      // Thread creation failed - dialog stays open
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to create thread");
     } finally {
       setIsCreating(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        setIsOpen(open);
+        if (open) setErrorMessage(null);
+      }}
+    >
       <DialogTrigger asChild>
         <Button
           variant="outline"
@@ -78,7 +94,13 @@ export function NewThreadDialog({ agents }: NewThreadDialogProps) {
           </DialogDescription>
         </DialogHeader>
         <div className="py-3">
-          <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+          <Select
+            value={selectedAgent}
+            onValueChange={(value) => {
+              setSelectedAgent(value);
+              setErrorMessage(null);
+            }}
+          >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select an agent" />
             </SelectTrigger>
@@ -95,6 +117,7 @@ export function NewThreadDialog({ agents }: NewThreadDialogProps) {
               ))}
             </SelectContent>
           </Select>
+          {errorMessage ? <p className="mt-2 text-xs text-destructive/80">{errorMessage}</p> : null}
         </div>
         <DialogFooter>
           <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)} disabled={isCreating}>

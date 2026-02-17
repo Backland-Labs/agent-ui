@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, desc, sql } from "drizzle-orm";
 import { db as defaultDb } from "../../../../db/client";
 import { agents, threads, messages } from "../../../../db/schema";
+import { syncAgentsToDb } from "../../../../db/sync-agents";
 import type { InboxThread } from "@/types";
 
 type Db = typeof defaultDb;
@@ -99,11 +100,13 @@ export async function handlePostThread(
 }
 
 export async function GET(req: NextRequest) {
+  await syncAgentsToDb(defaultDb);
   const agentFilter = req.nextUrl.searchParams.get("agent") ?? undefined;
   return handleGetThreads(defaultDb, agentFilter);
 }
 
 export async function POST(req: NextRequest) {
+  await syncAgentsToDb(defaultDb);
   const body = await req.json();
   return handlePostThread(defaultDb, body);
 }

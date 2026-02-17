@@ -40,7 +40,18 @@ export function InboxContent({ agents }: InboxContentProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ agentId, title: "New conversation" }),
     });
+
+    if (!res.ok) {
+      const errorData = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(errorData?.error || "Failed to create thread");
+    }
+
     const thread = await res.json();
+
+    if (!thread?.id || typeof thread.id !== "string") {
+      throw new Error("Thread creation did not return a valid id");
+    }
+
     return { id: thread.id };
   };
 

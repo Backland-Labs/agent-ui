@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { eq, asc } from "drizzle-orm";
 import { db as defaultDb } from "../../../../db/client";
 import * as schema from "../../../../db/schema";
+import { syncAgentsToDb } from "../../../../db/sync-agents";
 import { logger } from "@/lib/server/logger";
 
 type Db = typeof defaultDb;
@@ -405,5 +406,6 @@ export async function handleGatewayPost(req: Request, db: Db): Promise<Response>
  * Next.js route handler -- uses the default database from db/client.ts.
  */
 export async function POST(req: NextRequest) {
+  await syncAgentsToDb(defaultDb);
   return handleGatewayPost(req, defaultDb);
 }
