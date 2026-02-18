@@ -6,13 +6,19 @@ import { syncAgentsToDb } from "../../../../db/sync-agents";
 import type { LandingNarrativeItem, LandingNarrativeResponse } from "@/types";
 
 type Db = typeof defaultDb;
-type Fetcher = (input: string) => Promise<Response>;
+type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 const EMAIL_AGENT_ID = "email-agent";
 const NARRATIVE_PATH = "/narrative";
 const SNIPPET_LIMIT = 140;
 const PREVIEW_LIMIT = 7;
 const EPOCH_ISO = "1970-01-01T00:00:00.000Z";
+
+function toNarrativeEndpoint(endpointUrl: string): string {
+  const normalizedEndpoint = endpointUrl.replace(/\/$/, "");
+  const serviceRoot = normalizedEndpoint.replace(/\/agent$/, "");
+  return `${serviceRoot}${NARRATIVE_PATH}`;
+}
 
 function sanitizeSnippet(value: string | null | undefined): string {
   if (!value?.trim()) {
@@ -150,11 +156,16 @@ export async function handleGetNarrative(
     return NextResponse.json({ error: "Email narrative source unavailable" }, { status: 404 });
   }
 
-  const baseEndpoint = configuredAgent.endpointUrl.replace(/\/$/, "");
-  const endpoint = `${baseEndpoint}${NARRATIVE_PATH}`;
+  const endpoint = toNarrativeEndpoint(configuredAgent.endpointUrl);
 
   try {
-    const response = await fetcher(endpoint);
+    const response = await fetcher(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
 
     if (!response.ok) {
       return NextResponse.json({ error: "Unable to load email narrative" }, { status: 502 });

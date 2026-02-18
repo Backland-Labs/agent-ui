@@ -110,7 +110,13 @@ describe("GET /api/narrative", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(fetcher).toHaveBeenCalledWith("http://email-agent.test/agent/narrative");
+    expect(fetcher).toHaveBeenCalledWith("http://email-agent.test/narrative", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
     expect(data.items).toHaveLength(7);
     expect(data.items.map((item: { threadId: string }) => item.threadId)).toEqual([
       "thread-9",
