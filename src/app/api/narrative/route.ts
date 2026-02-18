@@ -50,7 +50,7 @@ function getNarrativeCacheMissReason(
   cacheEntry: NarrativeCacheEntry | null,
   cacheKey: string,
   nowMs: number
-): "empty" | "cache_key_mismatch" | "expired" {
+): "empty" | "cache_key_mismatch" | "expired" | "unexpected_valid_entry" {
   if (!cacheEntry) {
     return "empty";
   }
@@ -63,8 +63,7 @@ function getNarrativeCacheMissReason(
     return "expired";
   }
 
-  return "expired"; // unreachable: caller guarantees miss condition
-
+  return "unexpected_valid_entry";
 }
 
 function toNarrativeEndpoint(endpointUrl: string): string {
