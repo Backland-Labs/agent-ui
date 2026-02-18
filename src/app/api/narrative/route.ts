@@ -63,7 +63,8 @@ function getNarrativeCacheMissReason(
     return "expired";
   }
 
-  return "expired";
+  return "expired"; // unreachable: caller guarantees miss condition
+
 }
 
 function toNarrativeEndpoint(endpointUrl: string): string {
