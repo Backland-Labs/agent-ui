@@ -174,6 +174,36 @@ describe("GET /api/narrative", () => {
     expect(data.items).toEqual([]);
   });
 
+  it("extracts item payloads from SSE response data", async () => {
+    await seedEmailAgent(db);
+
+    const body = [
+      'event: RUN_STARTED\ndata: {"type":"RUN_STARTED","runId":"run-1"}',
+      [
+        "event: RUN_FINISHED",
+        [
+          'data: {"type":"RUN_FINISHED","result":{"items":[{"thread_id":"thread-2","agent_name":"Email Agent","title":"Second","snippet":"later","last_activity_at":"2026-02-16T12:02:00.000Z"},{"thread_id":"thread-1","agent_name":"Email Agent","title":"First","snippet":"earlier","last_activity_at":"2026-02-16T12:01:00.000Z"}]}}',
+        ].join("\n"),
+      ].join("\n"),
+    ].join("\n\n");
+
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(body, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      })
+    );
+
+    const response = await handleGetNarrative(db, fetcher);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.items.map((item: { threadId: string }) => item.threadId)).toEqual([
+      "thread-2",
+      "thread-1",
+    ]);
+  });
+
   it("returns 502 when narrative endpoint returns non-ok response", async () => {
     await seedEmailAgent(db);
 
@@ -197,7 +227,7 @@ describe("GET /api/narrative", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it("returns 500 when response body cannot be parsed", async () => {
+  it("returns empty data when response body cannot be parsed", async () => {
     await seedEmailAgent(db);
 
     const fetcher = vi.fn().mockResolvedValue(new Response("not-json", { status: 200 }));
@@ -205,7 +235,7 @@ describe("GET /api/narrative", () => {
     const response = await handleGetNarrative(db, fetcher);
     const data = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(data).toMatchObject({ error: "Unable to load email narrative" });
+    expect(response.status).toBe(200);
+    expect(data.items).toEqual([]);
   });
 });

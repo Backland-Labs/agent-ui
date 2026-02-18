@@ -14,6 +14,9 @@ const SNIPPET_LIMIT = 140;
 const PREVIEW_LIMIT = 7;
 const EPOCH_ISO = "1970-01-01T00:00:00.000Z";
 
+const SSE_SEPARATOR_REGEX = /\r?\n\r?\n/;
+const SSE_LINE_REGEX = /\r?\n/;
+
 function toNarrativeEndpoint(endpointUrl: string): string {
   const normalizedEndpoint = endpointUrl.replace(/\/$/, "");
   const serviceRoot = normalizedEndpoint.replace(/\/agent$/, "");
@@ -26,6 +29,105 @@ function sanitizeSnippet(value: string | null | undefined): string {
   }
 
   return value.length > SNIPPET_LIMIT ? `${value.slice(0, SNIPPET_LIMIT)}…` : value;
+}
+
+function tryParseJson(value: string): unknown | null {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function hasRecordPayload(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return true;
+  }
+
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  return Array.isArray(record.items) || Array.isArray(record.data);
+}
+
+function getNestedCandidates(value: unknown): unknown[] {
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+
+  const record = value as Record<string, unknown>;
+  const keys = ["data", "result", "runResult", "payload", "output"];
+  const nested: unknown[] = [];
+
+  for (const key of keys) {
+    const candidate = record[key];
+
+    if (candidate === undefined) {
+      continue;
+    }
+
+    nested.push(candidate);
+
+    if (typeof candidate === "string") {
+      const parsed = tryParseJson(candidate);
+      if (parsed !== null) {
+        nested.push(parsed);
+      }
+    }
+  }
+
+  return nested;
+}
+
+function extractSseCandidates(bodyText: string): unknown[] {
+  const candidates: unknown[] = [];
+
+  for (const chunk of bodyText.split(SSE_SEPARATOR_REGEX)) {
+    if (!chunk.trim()) {
+      continue;
+    }
+
+    const dataLines = chunk
+      .split(SSE_LINE_REGEX)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart());
+
+    if (dataLines.length === 0) {
+      continue;
+    }
+
+    const parsedData = tryParseJson(dataLines.join("\n"));
+    if (parsedData === null) {
+      continue;
+    }
+
+    candidates.push(parsedData, ...getNestedCandidates(parsedData));
+  }
+
+  return candidates;
+}
+
+function extractNarrativePayload(bodyText: string): unknown {
+  const trimmed = bodyText.trim();
+
+  if (!trimmed) {
+    return [];
+  }
+
+  const directJson = tryParseJson(trimmed);
+  if (directJson !== null) {
+    return directJson;
+  }
+
+  for (const candidate of extractSseCandidates(trimmed)) {
+    if (hasRecordPayload(candidate)) {
+      return candidate;
+    }
+  }
+
+  return [];
 }
 
 function sanitizeRole(role: string | null | undefined): "user" | "assistant" | "system" | null {
@@ -171,8 +273,8 @@ export async function handleGetNarrative(
       return NextResponse.json({ error: "Unable to load email narrative" }, { status: 502 });
     }
 
-    const body = await response.json();
-    const items = mapItems(body);
+    const bodyText = await response.text();
+    const items = mapItems(extractNarrativePayload(bodyText));
 
     const responseBody: LandingNarrativeResponse = {
       items,
