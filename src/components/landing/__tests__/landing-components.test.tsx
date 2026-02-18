@@ -1,64 +1,152 @@
-import { describe, it, expect } from "vitest";
-import { render, within } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { fireEvent, render, within } from "@testing-library/react";
 import { AgentInboxPreview } from "../AgentInboxPreview";
 import { DailyDigestCard } from "../DailyDigestCard";
 import { LandingCalendarCard } from "../LandingCalendarCard";
-import type { DailyDigest } from "@/types";
+import type { DailyDigest, LandingNarrativeItem } from "@/types";
 import type { CalendarEvent, AccountError } from "@/types/calendar.types";
 
-describe("AgentInboxPreview", () => {
-  const threads = [
-    {
-      threadId: "t-1",
-      agentName: "Support",
-      title: "Welcome flow",
-      snippet: "Draft finished",
-      lastActivityAt: new Date().toISOString(),
-      lastMessageRole: "assistant" as const,
-    },
-  ];
+const narrativeThreads: LandingNarrativeItem[] = [
+  {
+    threadId: "t-1",
+    agentName: "Email Agent",
+    title: "Welcome flow",
+    snippet: "Draft finished",
+    lastActivityAt: new Date().toISOString(),
+    lastMessageRole: "assistant" as const,
+  },
+];
 
+describe("AgentInboxPreview", () => {
   it("shows loading state", () => {
     const { container } = render(
-      <AgentInboxPreview threads={[]} loading={true} error={null} refresh={() => undefined} />
-    );
-    const getByText = within(container).getByText;
-
-    expect(getByText("Loading inbox preview...")).toBeTruthy();
-  });
-
-  it("shows empty state when no threads", () => {
-    const { container } = render(
-      <AgentInboxPreview threads={[]} loading={false} error={null} refresh={() => undefined} />
-    );
-    const getByText = within(container).getByText;
-
-    expect(getByText("All caught up.")).toBeTruthy();
-    expect(getByText("No recent threads in the last 24 hours.")).toBeTruthy();
-  });
-
-  it("shows an error state", () => {
-    const { container } = render(
       <AgentInboxPreview
-        threads={[]}
-        loading={false}
-        error="Unable to load inbox preview"
+        items={[]}
+        state="initial_loading"
+        terminalError={null}
+        refreshError={null}
+        isRefreshing={false}
         refresh={() => undefined}
       />
     );
     const getByText = within(container).getByText;
 
-    expect(getByText("Unable to load inbox preview")).toBeTruthy();
+    expect(getByText("Loading email narrative...")).toBeTruthy();
   });
 
-  it("renders thread rows", () => {
+  it("shows empty state when no threads", () => {
     const { container } = render(
-      <AgentInboxPreview threads={threads} loading={false} error={null} refresh={() => undefined} />
+      <AgentInboxPreview
+        items={[]}
+        state="empty"
+        terminalError={null}
+        refreshError={null}
+        isRefreshing={false}
+        refresh={() => undefined}
+      />
+    );
+    const getByText = within(container).getByText;
+
+    expect(getByText("All caught up.")).toBeTruthy();
+    expect(getByText("No recent items to triage from the email agent.")).toBeTruthy();
+  });
+
+  it("shows an error state", () => {
+    const { container } = render(
+      <AgentInboxPreview
+        items={[]}
+        state="terminal_error"
+        terminalError="Unable to load email narrative"
+        refreshError={null}
+        isRefreshing={false}
+        refresh={() => undefined}
+      />
+    );
+    const getByText = within(container).getByText;
+
+    expect(getByText("Unable to load email narrative")).toBeTruthy();
+  });
+
+  it("shows source unavailable copy when provided by hook", () => {
+    const { container } = render(
+      <AgentInboxPreview
+        items={[]}
+        state="terminal_error"
+        terminalError="Email narrative source unavailable"
+        refreshError={null}
+        isRefreshing={false}
+        refresh={() => undefined}
+      />
+    );
+    const getByText = within(container).getByText;
+
+    expect(getByText("Email narrative source unavailable")).toBeTruthy();
+  });
+
+  it("renders narrative rows", () => {
+    const { container } = render(
+      <AgentInboxPreview
+        items={narrativeThreads}
+        state="success"
+        terminalError={null}
+        refreshError={null}
+        isRefreshing={false}
+        refresh={() => undefined}
+      />
     );
     const getByText = within(container).getByText;
 
     expect(getByText("Welcome flow")).toBeTruthy();
     expect(getByText("Draft finished")).toBeTruthy();
+  });
+
+  it("keeps rows visible and offers retry when refresh error overlays success", () => {
+    const onRefresh = () => undefined;
+
+    const { container } = render(
+      <AgentInboxPreview
+        items={narrativeThreads}
+        state="success"
+        terminalError={null}
+        refreshError="Unable to load email narrative"
+        isRefreshing={false}
+        refresh={onRefresh}
+      />
+    );
+    const getByText = within(container).getByText;
+
+    expect(getByText("Unable to load email narrative")).toBeTruthy();
+    expect(getByText("Retry")).toBeTruthy();
+    expect(getByText("Welcome flow")).toBeTruthy();
+  });
+
+  it("filters out rows with invalid thread ids", () => {
+    const onRefresh = vi.fn();
+
+    const { container } = render(
+      <AgentInboxPreview
+        items={[
+          narrativeThreads[0],
+          {
+            ...narrativeThreads[0],
+            threadId: "   ",
+            title: "Should not render",
+          },
+        ]}
+        state="success"
+        terminalError={null}
+        refreshError={null}
+        isRefreshing={false}
+        refresh={onRefresh}
+      />
+    );
+
+    expect(within(container).getByText("Welcome flow")).toBeTruthy();
+    expect(within(container).queryByText("Should not render")).toBeNull();
+
+    const refreshButton = within(container).getByRole("button", { name: "Refresh" });
+    fireEvent.click(refreshButton);
+    expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 });
 

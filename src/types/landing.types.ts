@@ -30,6 +30,21 @@ export interface DailyDigest {
   agentRollups: DigestAgentRollup[];
 }
 
+export interface LandingNarrativeItem {
+  threadId: string;
+  agentName: string;
+  title: string;
+  snippet: string;
+  lastActivityAt: string;
+  lastMessageRole: "user" | "assistant" | "system" | null;
+}
+
+export interface LandingNarrativeResponse {
+  items: LandingNarrativeItem[];
+}
+
+export type LandingNarrativeState = "initial_loading" | "success" | "empty" | "terminal_error";
+
 export interface LandingInboxThreadPreview {
   threadId: string;
   agentName: string;
