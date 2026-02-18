@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db as defaultDb } from "../../../../db/client";
 import { agents } from "../../../../db/schema";
 import { syncAgentsToDb } from "../../../../db/sync-agents";
+import { logger } from "@/lib/server/logger";
 import type { LandingNarrativeItem, LandingNarrativeResponse } from "@/types";
 
 type Db = typeof defaultDb;
@@ -246,21 +247,38 @@ export async function handleGetNarrative(
   db: Db = defaultDb,
   fetcher: Fetcher = fetch
 ): Promise<NextResponse> {
-  const [configuredAgent] = await db
-    .select({
-      endpointUrl: agents.endpoint_url,
-      name: agents.name,
-    })
-    .from(agents)
-    .where(eq(agents.id, EMAIL_AGENT_ID));
+  const startedAt = Date.now();
+  const log = logger.child({
+    requestId: crypto.randomUUID(),
+    route: "/api/narrative",
+    agentId: EMAIL_AGENT_ID,
+  });
 
-  if (!configuredAgent?.endpointUrl) {
-    return NextResponse.json({ error: "Email narrative source unavailable" }, { status: 404 });
-  }
-
-  const endpoint = toNarrativeEndpoint(configuredAgent.endpointUrl);
+  log.info({ event: "narrative.started" }, "narrative request started");
 
   try {
+    const [configuredAgent] = await db
+      .select({
+        endpointUrl: agents.endpoint_url,
+        name: agents.name,
+      })
+      .from(agents)
+      .where(eq(agents.id, EMAIL_AGENT_ID));
+
+    if (!configuredAgent?.endpointUrl) {
+      log.warn(
+        {
+          event: "narrative.source_unavailable",
+          durationMs: Date.now() - startedAt,
+        },
+        "email narrative source unavailable"
+      );
+
+      return NextResponse.json({ error: "Email narrative source unavailable" }, { status: 404 });
+    }
+
+    const endpoint = toNarrativeEndpoint(configuredAgent.endpointUrl);
+
     const response = await fetcher(endpoint, {
       method: "POST",
       headers: {
@@ -270,6 +288,15 @@ export async function handleGetNarrative(
     });
 
     if (!response.ok) {
+      log.error(
+        {
+          event: "narrative.upstream_failed",
+          durationMs: Date.now() - startedAt,
+          upstreamStatus: response.status,
+        },
+        "narrative upstream request failed"
+      );
+
       return NextResponse.json({ error: "Unable to load email narrative" }, { status: 502 });
     }
 
@@ -280,8 +307,26 @@ export async function handleGetNarrative(
       items,
     };
 
+    log.info(
+      {
+        event: "narrative.completed",
+        durationMs: Date.now() - startedAt,
+        itemCount: items.length,
+      },
+      "narrative request completed"
+    );
+
     return NextResponse.json(responseBody);
-  } catch {
+  } catch (error) {
+    log.error(
+      {
+        event: "narrative.failed",
+        durationMs: Date.now() - startedAt,
+        err: error,
+      },
+      "narrative request failed"
+    );
+
     return NextResponse.json({ error: "Unable to load email narrative" }, { status: 500 });
   }
 }
