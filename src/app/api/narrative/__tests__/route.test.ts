@@ -3,7 +3,11 @@ import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import * as schema from "../../../../../db/schema";
-import { handleGetNarrative } from "../route";
+import {
+  handleGetNarrative,
+  resetNarrativeCacheForTests,
+  shouldBypassNarrativeCache,
+} from "../route";
 
 type TestDb = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -14,11 +18,11 @@ async function createTestDb(): Promise<TestDb> {
   return db;
 }
 
-async function seedEmailAgent(db: TestDb) {
+async function seedEmailAgent(db: TestDb, endpointUrl = "http://email-agent.test/agent") {
   await db.insert(schema.agents).values({
     id: "email-agent",
     name: "Email Agent",
-    endpoint_url: "http://email-agent.test/agent",
+    endpoint_url: endpointUrl,
     status: "online" as const,
     icon: "bot",
     description: "Email inbox agent",
@@ -39,6 +43,7 @@ describe("GET /api/narrative", () => {
 
   beforeEach(async () => {
     db = await createTestDb();
+    resetNarrativeCacheForTests();
   });
 
   it("normalizes, sorts, and limits narrative items", async () => {
@@ -280,5 +285,394 @@ describe("GET /api/narrative", () => {
     expect(data.items).toEqual([]);
     expect(data.narrative).toBe("");
     expect(data.actionItems).toEqual([]);
+  });
+
+  it("returns 500 when an unexpected upstream error is thrown", async () => {
+    const throwingDb = {
+      select: () => {
+        throw new Error("db failure");
+      },
+    } as const;
+
+    const response = await handleGetNarrative(throwingDb as unknown as never, vi.fn());
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data).toMatchObject({ error: "Unable to load email narrative" });
+  });
+
+  it("normalizes nested payload JSON and object action items", async () => {
+    await seedEmailAgent(db);
+
+    const fetcher = vi.fn().mockResolvedValue(
+      jsonResponse({
+        payload: JSON.stringify({
+          items: [
+            {
+              thread_id: "thread-nested",
+              title: "Nested",
+              snippet: "Nested summary",
+              timestamp: 1700000000000,
+            },
+          ],
+          narrative: "Nested payload summary",
+          actionItems: [{ text: "Follow nested thread" }],
+        }),
+      })
+    );
+
+    const response = await handleGetNarrative(db, fetcher);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.items).toHaveLength(1);
+    expect(data.items[0]).toMatchObject({
+      threadId: "thread-nested",
+      title: "Nested",
+      snippet: "Nested summary",
+      lastMessageRole: null,
+    });
+    expect(data.narrative).toBe("Nested payload summary");
+    expect(data.actionItems).toEqual(["Follow nested thread"]);
+  });
+
+  it("sorts stable when timestamps tie on the same millisecond", async () => {
+    await seedEmailAgent(db);
+
+    const fetcher = vi.fn().mockResolvedValue(
+      jsonResponse({
+        data: [
+          {
+            thread_id: "thread-b",
+            title: "B",
+            snippet: "second",
+            timestamp: 1700000000000,
+          },
+          {
+            thread_id: "thread-a",
+            title: "A",
+            snippet: "first",
+            timestamp: 1700000000000,
+          },
+        ],
+      })
+    );
+
+    const response = await handleGetNarrative(db, fetcher);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.items.map((item: { threadId: string }) => item.threadId)).toEqual([
+      "thread-a",
+      "thread-b",
+    ]);
+  });
+
+  it("ignores SSE chunks without data lines", async () => {
+    await seedEmailAgent(db);
+
+    const body = [
+      ["event: RUN_STARTED", "id: run-empty"].join("\n"),
+      ["event: RUN_FINISHED", "id: run-empty"].join("\n"),
+    ].join("\n\n");
+
+    const fetcher = vi.fn().mockResolvedValue(new Response(body, { status: 200 }));
+
+    const response = await handleGetNarrative(db, fetcher);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.items).toEqual([]);
+    expect(data.narrative).toBe("");
+    expect(data.actionItems).toEqual([]);
+  });
+
+  it("reuses cached successful response for repeated requests within TTL", async () => {
+    await seedEmailAgent(db);
+
+    const fetcher = vi.fn().mockResolvedValue(
+      jsonResponse({
+        items: [
+          {
+            thread_id: "thread-1",
+            title: "First",
+            snippet: "cached",
+            last_activity_at: "2026-02-16T12:01:00.000Z",
+          },
+        ],
+        narrative: "Cached narrative",
+        actionItems: ["Reply to thread-1"],
+      })
+    );
+
+    const firstResponse = await handleGetNarrative(db, fetcher, { nowMs: 1_000 });
+    const firstData = await firstResponse.json();
+    const secondResponse = await handleGetNarrative(db, fetcher, { nowMs: 1_500 });
+    const secondData = await secondResponse.json();
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(secondData).toEqual(firstData);
+  });
+
+  it("treats cache entry as expired when age reaches TTL boundary", async () => {
+    await seedEmailAgent(db);
+
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            {
+              thread_id: "thread-a",
+              title: "First",
+              snippet: "first",
+              last_activity_at: "2026-02-16T12:01:00.000Z",
+            },
+          ],
+          narrative: "Summary A",
+          actionItems: [],
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            {
+              thread_id: "thread-b",
+              title: "Second",
+              snippet: "second",
+              last_activity_at: "2026-02-16T12:02:00.000Z",
+            },
+          ],
+          narrative: "Summary B",
+          actionItems: ["Reply to thread-b"],
+        })
+      );
+
+    await handleGetNarrative(db, fetcher, { nowMs: 10_000 });
+    const response = await handleGetNarrative(db, fetcher, { nowMs: 70_000 });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(data.items[0]).toMatchObject({ threadId: "thread-b" });
+    expect(data.narrative).toBe("Summary B");
+    expect(data.actionItems).toEqual(["Reply to thread-b"]);
+  });
+
+  it("bypasses cache and refreshes stored payload when requested", async () => {
+    await seedEmailAgent(db);
+
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            {
+              thread_id: "thread-old",
+              title: "Old",
+              snippet: "old",
+              last_activity_at: "2026-02-16T12:01:00.000Z",
+            },
+          ],
+          narrative: "Summary old",
+          actionItems: [],
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            {
+              thread_id: "thread-new",
+              title: "New",
+              snippet: "new",
+              last_activity_at: "2026-02-16T12:02:00.000Z",
+            },
+          ],
+          narrative: "Summary new",
+          actionItems: ["Reply to thread-new"],
+        })
+      );
+
+    await handleGetNarrative(db, fetcher, { nowMs: 1_000 });
+
+    const bypassResponse = await handleGetNarrative(db, fetcher, {
+      bypassCache: true,
+      nowMs: 1_500,
+    });
+    const bypassData = await bypassResponse.json();
+
+    const cachedResponse = await handleGetNarrative(db, fetcher, { nowMs: 2_000 });
+    const cachedData = await cachedResponse.json();
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(bypassData.items[0]).toMatchObject({ threadId: "thread-new" });
+    expect(cachedData.items[0]).toMatchObject({ threadId: "thread-new" });
+  });
+
+  it("keeps prior cached success when bypass refresh fails", async () => {
+    await seedEmailAgent(db);
+
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            {
+              thread_id: "thread-cached",
+              title: "Cached",
+              snippet: "cached",
+              last_activity_at: "2026-02-16T12:01:00.000Z",
+            },
+          ],
+          narrative: "Cached summary",
+          actionItems: [],
+        })
+      )
+      .mockResolvedValueOnce(new Response("upstream failure", { status: 500 }));
+
+    await handleGetNarrative(db, fetcher, { nowMs: 1_000 });
+
+    const failedBypassResponse = await handleGetNarrative(db, fetcher, {
+      bypassCache: true,
+      nowMs: 1_500,
+    });
+    expect(failedBypassResponse.status).toBe(502);
+
+    const cachedResponse = await handleGetNarrative(db, fetcher, { nowMs: 2_000 });
+    const cachedData = await cachedResponse.json();
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(cachedResponse.status).toBe(200);
+    expect(cachedData.items[0]).toMatchObject({ threadId: "thread-cached" });
+  });
+
+  it("does not serve stale cache when expired entry refetch fails", async () => {
+    await seedEmailAgent(db);
+
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            {
+              thread_id: "thread-old",
+              title: "Old",
+              snippet: "old",
+              last_activity_at: "2026-02-16T12:01:00.000Z",
+            },
+          ],
+          narrative: "Summary old",
+          actionItems: [],
+        })
+      )
+      .mockResolvedValueOnce(new Response("upstream failure", { status: 500 }));
+
+    await handleGetNarrative(db, fetcher, { nowMs: 1_000 });
+
+    const response = await handleGetNarrative(db, fetcher, { nowMs: 61_000 });
+    const data = await response.json();
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(response.status).toBe(502);
+    expect(data).toMatchObject({ error: "Unable to load email narrative" });
+  });
+
+  it("does not cache non-ok upstream responses", async () => {
+    await seedEmailAgent(db);
+
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("bad", { status: 500 }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            {
+              thread_id: "thread-2",
+              title: "Recovered",
+              snippet: "ok",
+              last_activity_at: "2026-02-16T12:02:00.000Z",
+            },
+          ],
+          narrative: "Recovered summary",
+          actionItems: ["Follow up"],
+        })
+      );
+
+    const firstResponse = await handleGetNarrative(db, fetcher, { nowMs: 1_000 });
+    const secondResponse = await handleGetNarrative(db, fetcher, { nowMs: 1_500 });
+    const secondData = await secondResponse.json();
+
+    expect(firstResponse.status).toBe(502);
+    expect(secondResponse.status).toBe(200);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(secondData.items[0]).toMatchObject({ threadId: "thread-2" });
+  });
+
+  it("uses endpoint-aware cache keys", async () => {
+    const dbOne = await createTestDb();
+    const dbTwo = await createTestDb();
+
+    await seedEmailAgent(dbOne, "http://email-agent-one.test/agent");
+    await seedEmailAgent(dbTwo, "http://email-agent-two.test/agent");
+
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            {
+              thread_id: "thread-one",
+              title: "One",
+              snippet: "one",
+              last_activity_at: "2026-02-16T12:01:00.000Z",
+            },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            {
+              thread_id: "thread-two",
+              title: "Two",
+              snippet: "two",
+              last_activity_at: "2026-02-16T12:02:00.000Z",
+            },
+          ],
+        })
+      );
+
+    const firstResponse = await handleGetNarrative(dbOne, fetcher, { nowMs: 1_000 });
+    const secondResponse = await handleGetNarrative(dbTwo, fetcher, { nowMs: 1_500 });
+    const firstData = await firstResponse.json();
+    const secondData = await secondResponse.json();
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenNthCalledWith(1, "http://email-agent-one.test/narrative", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(2, "http://email-agent-two.test/narrative", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+    expect(firstData.items[0]).toMatchObject({ threadId: "thread-one" });
+    expect(secondData.items[0]).toMatchObject({ threadId: "thread-two" });
+  });
+
+  it("treats only refresh=1 as cache bypass", () => {
+    expect(shouldBypassNarrativeCache("1")).toBe(true);
+    expect(shouldBypassNarrativeCache(null)).toBe(false);
+    expect(shouldBypassNarrativeCache("0")).toBe(false);
+    expect(shouldBypassNarrativeCache("true")).toBe(false);
+    expect(shouldBypassNarrativeCache("")).toBe(false);
   });
 });
