@@ -127,6 +127,75 @@ describe("GET /api/digest", () => {
     });
   });
 
+  it("truncates long snippets and preserves the latest thread text", async () => {
+    const agent = await seedAgent(db);
+    const thread = await seedThread(db, agent.id, {
+      title: "Long update",
+      last_activity_at: new Date("2026-02-14T11:05:00.000Z"),
+      created_at: new Date("2026-02-14T11:05:00.000Z"),
+    });
+    await seedMessage(db, thread.id, {
+      content: "x".repeat(140),
+      created_at: new Date("2026-02-14T11:20:00.000Z"),
+    });
+    await seedRun(db, thread.id);
+
+    const response = await handleGetDigest(db, new Date("2026-02-14T12:00:00.000Z"));
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.topItems).toHaveLength(1);
+    expect(data.topItems[0]).toMatchObject({
+      subject: "Long update",
+      snippet: `${"x".repeat(130)}…`,
+    });
+  });
+
+  it("normalizes unknown message role and null message to defaults", async () => {
+    const agent = await seedAgent(db);
+    const thread = await seedThread(db, agent.id, {
+      title: "No latest message",
+      last_activity_at: new Date("2026-02-14T10:00:00.000Z"),
+      created_at: new Date("2026-02-14T10:00:00.000Z"),
+    });
+
+    await seedMessage(db, thread.id, {
+      role: "human" as unknown as "user",
+      content: "Should be hidden",
+      created_at: new Date("2026-02-14T10:20:00.000Z"),
+    });
+
+    const response = await handleGetDigest(db, new Date("2026-02-14T12:00:00.000Z"));
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.topItems).toHaveLength(1);
+    expect(data.topItems[0]).toMatchObject({
+      subject: "No latest message",
+      lastMessageRole: null,
+    });
+  });
+
+  it("returns fallback snippet when no latest message exists", async () => {
+    const agent = await seedAgent(db);
+    await seedThread(db, agent.id, {
+      title: "No messages at all",
+      last_activity_at: new Date("2026-02-14T09:00:00.000Z"),
+      created_at: new Date("2026-02-14T09:00:00.000Z"),
+    });
+
+    const response = await handleGetDigest(db, new Date("2026-02-14T12:00:00.000Z"));
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.topItems).toHaveLength(1);
+    expect(data.topItems[0]).toMatchObject({
+      subject: "No messages at all",
+      snippet: "No messages yet",
+      lastMessageRole: null,
+    });
+  });
+
   it("returns empty-but-valid payload when there is no recent activity", async () => {
     const response = await handleGetDigest(db, new Date("2026-02-14T12:00:00.000Z"));
     const data = await response.json();

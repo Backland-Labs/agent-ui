@@ -287,6 +287,106 @@ describe("GET /api/narrative", () => {
     expect(data.actionItems).toEqual([]);
   });
 
+  it("returns 500 when an unexpected upstream error is thrown", async () => {
+    const throwingDb = {
+      select: () => {
+        throw new Error("db failure");
+      },
+    } as const;
+
+    const response = await handleGetNarrative(throwingDb as unknown as never, vi.fn());
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data).toMatchObject({ error: "Unable to load email narrative" });
+  });
+
+  it("normalizes nested payload JSON and object action items", async () => {
+    await seedEmailAgent(db);
+
+    const fetcher = vi.fn().mockResolvedValue(
+      jsonResponse({
+        payload: JSON.stringify({
+          items: [
+            {
+              thread_id: "thread-nested",
+              title: "Nested",
+              snippet: "Nested summary",
+              timestamp: 1700000000000,
+            },
+          ],
+          narrative: "Nested payload summary",
+          actionItems: [{ text: "Follow nested thread" }],
+        }),
+      })
+    );
+
+    const response = await handleGetNarrative(db, fetcher);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.items).toHaveLength(1);
+    expect(data.items[0]).toMatchObject({
+      threadId: "thread-nested",
+      title: "Nested",
+      snippet: "Nested summary",
+      lastMessageRole: null,
+    });
+    expect(data.narrative).toBe("Nested payload summary");
+    expect(data.actionItems).toEqual(["Follow nested thread"]);
+  });
+
+  it("sorts stable when timestamps tie on the same millisecond", async () => {
+    await seedEmailAgent(db);
+
+    const fetcher = vi.fn().mockResolvedValue(
+      jsonResponse({
+        data: [
+          {
+            thread_id: "thread-b",
+            title: "B",
+            snippet: "second",
+            timestamp: 1700000000000,
+          },
+          {
+            thread_id: "thread-a",
+            title: "A",
+            snippet: "first",
+            timestamp: 1700000000000,
+          },
+        ],
+      })
+    );
+
+    const response = await handleGetNarrative(db, fetcher);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.items.map((item: { threadId: string }) => item.threadId)).toEqual([
+      "thread-a",
+      "thread-b",
+    ]);
+  });
+
+  it("ignores SSE chunks without data lines", async () => {
+    await seedEmailAgent(db);
+
+    const body = [
+      ["event: RUN_STARTED", "id: run-empty"].join("\n"),
+      ["event: RUN_FINISHED", "id: run-empty"].join("\n"),
+    ].join("\n\n");
+
+    const fetcher = vi.fn().mockResolvedValue(new Response(body, { status: 200 }));
+
+    const response = await handleGetNarrative(db, fetcher);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.items).toEqual([]);
+    expect(data.narrative).toBe("");
+    expect(data.actionItems).toEqual([]);
+  });
+
   it("reuses cached successful response for repeated requests within TTL", async () => {
     await seedEmailAgent(db);
 
