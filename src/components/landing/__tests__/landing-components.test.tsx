@@ -99,6 +99,105 @@ describe("AgentInboxPreview", () => {
     expect(getByText("Reply to sponsor request")).toBeTruthy();
   });
 
+  it("renders markdown narrative with safe link handling", () => {
+    const markdownNarrative = [
+      "# 48h Inbox Narrative",
+      "",
+      "- Reviewed 5 unread emails",
+      "1. Reply to sponsor",
+      "",
+      "Use **priority** labels and `triage` commands.",
+      "",
+      "[Project board](/inbox)",
+      "[External brief](https://example.com/brief)",
+    ].join("\n");
+
+    const { container } = render(
+      <AgentInboxPreview
+        narrative={markdownNarrative}
+        actionItems={[]}
+        state="success"
+        terminalError={null}
+        refreshError={null}
+        isRefreshing={false}
+        refresh={() => undefined}
+      />
+    );
+    const getByText = within(container).getByText;
+    const getByRole = within(container).getByRole;
+
+    expect(getByText("48h Inbox Narrative").tagName).toBe("H1");
+    expect(getByText("Reviewed 5 unread emails").closest("li")).toBeTruthy();
+    expect(getByText("Reply to sponsor").closest("li")).toBeTruthy();
+    expect(getByText("priority").tagName).toBe("STRONG");
+    expect(getByText("triage").tagName).toBe("CODE");
+
+    const internalLink = getByRole("link", { name: "Project board" });
+    expect(internalLink.getAttribute("href")).toBe("/inbox");
+    expect(internalLink.getAttribute("target")).toBeNull();
+
+    const externalLink = getByRole("link", { name: "External brief" });
+    expect(externalLink.getAttribute("href")).toBe("https://example.com/brief");
+    expect(externalLink.getAttribute("target")).toBe("_blank");
+    expect(externalLink.getAttribute("rel")).toBe("noopener noreferrer nofollow ugc");
+  });
+
+  it("blocks unsafe markdown links", () => {
+    const { container } = render(
+      <AgentInboxPreview
+        narrative="[Do not click](javascript:alert('xss'))"
+        actionItems={[]}
+        state="success"
+        terminalError={null}
+        refreshError={null}
+        isRefreshing={false}
+        refresh={() => undefined}
+      />
+    );
+    const getByText = within(container).getByText;
+    const queryByRole = within(container).queryByRole;
+
+    expect(getByText("Do not click").tagName).toBe("SPAN");
+    expect(queryByRole("link", { name: "Do not click" })).toBeNull();
+  });
+
+  it("does not render raw html as active elements", () => {
+    const narrativeWithHtml = "<script>alert('xss')</script>\n\nSafe text";
+
+    const { container } = render(
+      <AgentInboxPreview
+        narrative={narrativeWithHtml}
+        actionItems={[]}
+        state="success"
+        terminalError={null}
+        refreshError={null}
+        isRefreshing={false}
+        refresh={() => undefined}
+      />
+    );
+    const getByText = within(container).getByText;
+
+    expect(getByText("Safe text")).toBeTruthy();
+    expect(container.querySelector("script")).toBeNull();
+  });
+
+  it("shows fallback text when narrative is whitespace", () => {
+    const { container } = render(
+      <AgentInboxPreview
+        narrative="    "
+        actionItems={[]}
+        state="success"
+        terminalError={null}
+        refreshError={null}
+        isRefreshing={false}
+        refresh={() => undefined}
+      />
+    );
+    const getByText = within(container).getByText;
+
+    expect(getByText("No narrative details returned.")).toBeTruthy();
+  });
+
   it("keeps summary visible and offers retry when refresh error overlays success", () => {
     const onRefresh = () => undefined;
 

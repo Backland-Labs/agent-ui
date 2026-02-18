@@ -1,7 +1,10 @@
 "use client";
 
+import type { ComponentPropsWithoutRef } from "react";
 import Link from "next/link";
 import { RefreshCw, MailOpen } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { LandingNarrativeState } from "@/types";
 
 interface AgentInboxPreviewProps {
@@ -12,6 +15,89 @@ interface AgentInboxPreviewProps {
   refreshError: string | null;
   isRefreshing: boolean;
   refresh: () => void;
+}
+
+const NARRATIVE_FALLBACK = "No narrative details returned.";
+const SAFE_REL = "noopener noreferrer nofollow ugc";
+const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+
+function getSafeNarrativeHref(href: string | undefined): string | null {
+  if (!href) {
+    return null;
+  }
+
+  const trimmedHref = href.trim();
+  if (!trimmedHref) {
+    return null;
+  }
+
+  if (trimmedHref.startsWith("#")) {
+    return trimmedHref;
+  }
+
+  if (trimmedHref.startsWith("//")) {
+    return null;
+  }
+
+  const normalized = trimmedHref.replace(/[\u0000-\u001F\u007F\s]+/g, "");
+  const protocolMatch = normalized.match(/^([a-zA-Z][a-zA-Z\d+.-]*):/);
+
+  if (!protocolMatch) {
+    return trimmedHref;
+  }
+
+  const protocol = `${protocolMatch[1].toLowerCase()}:`;
+  if (!SAFE_PROTOCOLS.has(protocol)) {
+    return null;
+  }
+
+  return trimmedHref;
+}
+
+function isExternalHref(href: string): boolean {
+  return /^https?:\/\//i.test(href);
+}
+
+function NarrativeLink({
+  href,
+  children,
+  ...props
+}: ComponentPropsWithoutRef<"a"> & { node?: unknown }) {
+  const safeHref = getSafeNarrativeHref(href);
+
+  if (!safeHref) {
+    return <span className="text-muted-foreground/75">{children}</span>;
+  }
+
+  const external = isExternalHref(safeHref);
+
+  return (
+    <a
+      {...props}
+      href={safeHref}
+      target={external ? "_blank" : undefined}
+      rel={external ? SAFE_REL : undefined}
+    >
+      {children}
+    </a>
+  );
+}
+
+function NarrativeMarkdown({ narrative }: { narrative: string }) {
+  return (
+    <div className="mt-1 text-xs leading-relaxed text-foreground/85 [&_a]:font-medium [&_a]:text-primary/80 [&_a]:underline [&_a]:decoration-primary/50 [&_a]:underline-offset-2 [&_a:hover]:text-primary [&_code]:rounded [&_code]:bg-accent/35 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:mb-1 [&_h1]:mt-2 [&_h1]:text-sm [&_h1]:font-semibold [&_h1:first-child]:mt-0 [&_h2]:mb-1 [&_h2]:mt-2 [&_h2]:text-sm [&_h2]:font-semibold [&_h2:first-child]:mt-0 [&_h3]:mb-1 [&_h3]:mt-2 [&_h3]:font-semibold [&_h3:first-child]:mt-0 [&_li]:leading-relaxed [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-4 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-accent/25 [&_pre]:p-2 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-4">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        disallowedElements={["img"]}
+        unwrapDisallowed={true}
+        components={{
+          a: NarrativeLink,
+        }}
+      >
+        {narrative}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
 function ThreadSkeleton() {
@@ -107,9 +193,13 @@ export function AgentInboxPreview({
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/75">
               Narrative
             </p>
-            <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-foreground/85">
-              {hasNarrative ? narrative : "No narrative details returned."}
-            </p>
+            {hasNarrative ? (
+              <NarrativeMarkdown narrative={narrative} />
+            ) : (
+              <p className="mt-1 text-xs leading-relaxed text-foreground/85">
+                {NARRATIVE_FALLBACK}
+              </p>
+            )}
           </div>
 
           <div className="rounded-md border border-border/20 bg-card/70 px-3 py-2">
