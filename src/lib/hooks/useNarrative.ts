@@ -98,7 +98,8 @@ export function useNarrative(): UseNarrativeReturn {
       }
 
       try {
-        const response = await fetch("/api/narrative", { signal: controller.signal });
+        const requestUrl = mode === "refresh" ? "/api/narrative?refresh=1" : "/api/narrative";
+        const response = await fetch(requestUrl, { signal: controller.signal });
 
         if (!mountedRef.current || requestIdRef.current !== requestId) {
           return;

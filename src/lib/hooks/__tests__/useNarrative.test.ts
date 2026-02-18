@@ -133,7 +133,8 @@ describe("useNarrative", () => {
   });
 
   it("keeps previous rows and sets refresh overlay error after refresh failure", async () => {
-    vi.spyOn(globalThis, "fetch")
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
         buildOkResponse(
           buildNarrativeResponse({
@@ -162,6 +163,16 @@ describe("useNarrative", () => {
     expect(result.current.narratives.map((item) => item.threadId)).toEqual(["thread-1"]);
     expect(result.current.error).toBeNull();
     expect(result.current.refreshError).toBe("Unable to load email narrative");
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      "/api/narrative",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      "/api/narrative?refresh=1",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
   });
 
   it("transitions to terminal_error on 404 during refresh even with prior data", async () => {

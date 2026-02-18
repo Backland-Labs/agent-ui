@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db as defaultDb } from "../../../../db/client";
 import { agents } from "../../../../db/schema";
@@ -17,10 +17,53 @@ const EPOCH_ISO = "1970-01-01T00:00:00.000Z";
 
 const SSE_SEPARATOR_REGEX = /\r?\n\r?\n/;
 const SSE_LINE_REGEX = /\r?\n/;
+const NARRATIVE_CACHE_TTL_MS = 60_000;
 
 interface NarrativeSummary {
   narrative: string;
   actionItems: string[];
+}
+
+interface NarrativeCacheEntry {
+  cacheKey: string;
+  payload: LandingNarrativeResponse;
+  cachedAtMs: number;
+  expiresAtMs: number;
+}
+
+interface NarrativeRequestOptions {
+  bypassCache?: boolean;
+  nowMs?: number;
+}
+
+let narrativeCache: NarrativeCacheEntry | null = null;
+
+export function resetNarrativeCacheForTests(): void {
+  narrativeCache = null;
+}
+
+export function shouldBypassNarrativeCache(refreshValue: string | null): boolean {
+  return refreshValue === "1";
+}
+
+function getNarrativeCacheMissReason(
+  cacheEntry: NarrativeCacheEntry | null,
+  cacheKey: string,
+  nowMs: number
+): "empty" | "cache_key_mismatch" | "expired" {
+  if (!cacheEntry) {
+    return "empty";
+  }
+
+  if (cacheEntry.cacheKey !== cacheKey) {
+    return "cache_key_mismatch";
+  }
+
+  if (cacheEntry.expiresAtMs <= nowMs) {
+    return "expired";
+  }
+
+  return "expired";
 }
 
 function toNarrativeEndpoint(endpointUrl: string): string {
@@ -329,9 +372,12 @@ function mapItems(payload: unknown): LandingNarrativeItem[] {
 
 export async function handleGetNarrative(
   db: Db = defaultDb,
-  fetcher: Fetcher = fetch
+  fetcher: Fetcher = fetch,
+  options: NarrativeRequestOptions = {}
 ): Promise<NextResponse> {
   const startedAt = Date.now();
+  const bypassCache = options.bypassCache === true;
+  const nowMs = options.nowMs ?? Date.now();
   const log = logger.child({
     requestId: crypto.randomUUID(),
     route: "/api/narrative",
@@ -362,6 +408,65 @@ export async function handleGetNarrative(
     }
 
     const endpoint = toNarrativeEndpoint(configuredAgent.endpointUrl);
+    const cacheKey = endpoint;
+    const cacheEntry = narrativeCache;
+
+    if (bypassCache) {
+      log.info(
+        {
+          event: "narrative.cache_bypass",
+          cacheKey,
+          bypass: true,
+          source: "upstream",
+          durationMs: Date.now() - startedAt,
+        },
+        "narrative cache bypassed"
+      );
+    } else if (cacheEntry && cacheEntry.cacheKey === cacheKey && cacheEntry.expiresAtMs > nowMs) {
+      const cacheAgeMs = nowMs - cacheEntry.cachedAtMs;
+
+      log.info(
+        {
+          event: "narrative.cache_hit",
+          cacheKey,
+          cacheAgeMs,
+          bypass: false,
+          source: "cache",
+          durationMs: Date.now() - startedAt,
+        },
+        "narrative cache hit"
+      );
+
+      log.info(
+        {
+          event: "narrative.completed",
+          source: "cache",
+          durationMs: Date.now() - startedAt,
+          itemCount: cacheEntry.payload.items.length,
+          actionItemCount: cacheEntry.payload.actionItems.length,
+          narrativeLength: cacheEntry.payload.narrative.length,
+        },
+        "narrative request completed"
+      );
+
+      return NextResponse.json(cacheEntry.payload);
+    } else {
+      const cacheAgeMs =
+        cacheEntry && cacheEntry.cacheKey === cacheKey ? nowMs - cacheEntry.cachedAtMs : undefined;
+
+      log.info(
+        {
+          event: "narrative.cache_miss",
+          cacheKey,
+          cacheAgeMs,
+          bypass: false,
+          source: "upstream",
+          reason: getNarrativeCacheMissReason(cacheEntry, cacheKey, nowMs),
+          durationMs: Date.now() - startedAt,
+        },
+        "narrative cache miss"
+      );
+    }
 
     const response = await fetcher(endpoint, {
       method: "POST",
@@ -394,9 +499,18 @@ export async function handleGetNarrative(
       actionItems: extractedPayload.actionItems,
     };
 
+    const cachedAtMs = options.nowMs ?? Date.now();
+    narrativeCache = {
+      cacheKey,
+      payload: responseBody,
+      cachedAtMs,
+      expiresAtMs: cachedAtMs + NARRATIVE_CACHE_TTL_MS,
+    };
+
     log.info(
       {
         event: "narrative.completed",
+        source: "upstream",
         durationMs: Date.now() - startedAt,
         itemCount: items.length,
         actionItemCount: responseBody.actionItems.length,
@@ -420,7 +534,10 @@ export async function handleGetNarrative(
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const refreshValue = req.nextUrl.searchParams.get("refresh");
+  const bypassCache = shouldBypassNarrativeCache(refreshValue);
+
   await syncAgentsToDb(defaultDb);
-  return handleGetNarrative(defaultDb, fetch);
+  return handleGetNarrative(defaultDb, fetch, { bypassCache });
 }
