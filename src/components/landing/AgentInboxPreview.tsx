@@ -2,20 +2,16 @@
 
 import Link from "next/link";
 import { RefreshCw, MailOpen } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
-import type { LandingNarrativeItem, LandingNarrativeState } from "@/types";
+import type { LandingNarrativeState } from "@/types";
 
 interface AgentInboxPreviewProps {
-  items: LandingNarrativeItem[];
+  narrative: string;
+  actionItems: string[];
   state: LandingNarrativeState;
   terminalError: string | null;
   refreshError: string | null;
   isRefreshing: boolean;
   refresh: () => void;
-}
-
-function getInitial(value: string): string {
-  return value.charAt(0).toUpperCase() || "A";
 }
 
 function ThreadSkeleton() {
@@ -39,19 +35,17 @@ function ThreadSkeleton() {
   );
 }
 
-function isValidThreadId(item: LandingNarrativeItem): boolean {
-  return item.threadId.trim().length > 0;
-}
-
 export function AgentInboxPreview({
-  items,
+  narrative,
+  actionItems,
   state,
   terminalError,
   refreshError,
   isRefreshing,
   refresh,
 }: AgentInboxPreviewProps) {
-  const threadItems = items.filter(isValidThreadId);
+  const hasNarrative = narrative.trim().length > 0;
+  const hasActionItems = actionItems.length > 0;
 
   return (
     <section className="rounded-xl border border-border/30 bg-card/60 flex-1 p-4">
@@ -59,7 +53,7 @@ export function AgentInboxPreview({
         <div>
           <h2 className="text-sm font-semibold text-foreground">Email Narrative</h2>
           <p className="font-mono text-[10px] text-muted-foreground/65">
-            Recent thread summaries from the email agent
+            Latest narrative brief and action items from the email agent
           </p>
         </div>
         <button
@@ -107,30 +101,35 @@ export function AgentInboxPreview({
         </div>
       ) : null}
 
-      {state === "success" && threadItems.length > 0 ? (
-        <div className="space-y-0">
-          {threadItems.map((thread, index) => (
-            <Link
-              key={thread.threadId}
-              href={`/thread/${thread.threadId}`}
-              className="flex items-start gap-3 border-b border-border/20 py-2.5 last:border-none hover:bg-accent/20 rounded-sm px-1 -mx-1 transition-colors animate-fade-in-up"
-              style={{ animationDelay: `${index * 40}ms` }}
-            >
-              <div className="h-7 w-7 shrink-0 rounded-full bg-accent border border-border/40 flex items-center justify-center text-[11px] font-medium">
-                {getInitial(thread.agentName)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-foreground/90 truncate">{thread.title}</p>
-                  <span className="font-mono text-[10px] text-muted-foreground/55 whitespace-nowrap">
-                    {formatDistanceToNow(new Date(thread.lastActivityAt), { addSuffix: true })}
-                  </span>
-                </div>
-                <p className="text-[11px] text-muted-foreground/70">{thread.agentName}</p>
-                <p className="text-xs text-muted-foreground/55 line-clamp-1">{thread.snippet}</p>
-              </div>
-            </Link>
-          ))}
+      {state === "success" ? (
+        <div className="space-y-3">
+          <div className="rounded-md border border-border/20 bg-accent/10 px-3 py-2">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/75">
+              Narrative
+            </p>
+            <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-foreground/85">
+              {hasNarrative ? narrative : "No narrative details returned."}
+            </p>
+          </div>
+
+          <div className="rounded-md border border-border/20 bg-card/70 px-3 py-2">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/75">
+              Action Items
+            </p>
+
+            {hasActionItems ? (
+              <ul className="mt-1 space-y-1 text-xs text-foreground/85">
+                {actionItems.map((item) => (
+                  <li key={item} className="flex items-start gap-1.5">
+                    <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-primary/70" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground/65">No immediate action items.</p>
+            )}
+          </div>
         </div>
       ) : null}
 

@@ -127,6 +127,8 @@ describe("GET /api/narrative", () => {
       "thread-4",
       "thread-3",
     ]);
+    expect(data.narrative).toBe("");
+    expect(data.actionItems).toEqual([]);
   });
 
   it("drops malformed rows and applies defaults for valid rows", async () => {
@@ -160,6 +162,8 @@ describe("GET /api/narrative", () => {
       lastMessageRole: null,
       lastActivityAt: "1970-01-01T00:00:00.000Z",
     });
+    expect(data.narrative).toBe("");
+    expect(data.actionItems).toEqual([]);
   });
 
   it("returns empty data when all endpoint rows are invalid", async () => {
@@ -172,6 +176,8 @@ describe("GET /api/narrative", () => {
 
     expect(response.status).toBe(200);
     expect(data.items).toEqual([]);
+    expect(data.narrative).toBe("");
+    expect(data.actionItems).toEqual([]);
   });
 
   it("extracts item payloads from SSE response data", async () => {
@@ -182,7 +188,7 @@ describe("GET /api/narrative", () => {
       [
         "event: RUN_FINISHED",
         [
-          'data: {"type":"RUN_FINISHED","result":{"items":[{"thread_id":"thread-2","agent_name":"Email Agent","title":"Second","snippet":"later","last_activity_at":"2026-02-16T12:02:00.000Z"},{"thread_id":"thread-1","agent_name":"Email Agent","title":"First","snippet":"earlier","last_activity_at":"2026-02-16T12:01:00.000Z"}]}}',
+          'data: {"type":"RUN_FINISHED","result":{"items":[{"thread_id":"thread-2","agent_name":"Email Agent","title":"Second","snippet":"later","last_activity_at":"2026-02-16T12:02:00.000Z"},{"thread_id":"thread-1","agent_name":"Email Agent","title":"First","snippet":"earlier","last_activity_at":"2026-02-16T12:01:00.000Z"}],"narrative":"Summary from run result","actionItems":["Reply to organizer"]}}',
         ].join("\n"),
       ].join("\n"),
     ].join("\n\n");
@@ -202,6 +208,41 @@ describe("GET /api/narrative", () => {
       "thread-2",
       "thread-1",
     ]);
+    expect(data.narrative).toBe("Summary from run result");
+    expect(data.actionItems).toEqual(["Reply to organizer"]);
+  });
+
+  it("extracts narrative and action items from SSE when no items are returned", async () => {
+    await seedEmailAgent(db);
+
+    const body = [
+      'data: {"type":"RUN_STARTED","runId":"run-2"}',
+      [
+        'data: {"type":"TEXT_MESSAGE_CONTENT","delta":"# 48h Inbox Narrative"}',
+        'data: {"type":"TEXT_MESSAGE_CONTENT","delta":"\\n\\n- Reviewed 5 unread emails"}',
+      ].join("\n\n"),
+      [
+        "event: RUN_FINISHED",
+        [
+          'data: {"type":"RUN_FINISHED","result":{"narrative":"# 48h Inbox Narrative\\n\\n- Reviewed 5 unread emails","actionItems":["Reply to sponsor"]}}',
+        ].join("\n"),
+      ].join("\n"),
+    ].join("\n\n");
+
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(body, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      })
+    );
+
+    const response = await handleGetNarrative(db, fetcher);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.items).toEqual([]);
+    expect(data.narrative).toBe("# 48h Inbox Narrative\n\n- Reviewed 5 unread emails");
+    expect(data.actionItems).toEqual(["Reply to sponsor"]);
   });
 
   it("returns 502 when narrative endpoint returns non-ok response", async () => {
@@ -237,5 +278,7 @@ describe("GET /api/narrative", () => {
 
     expect(response.status).toBe(200);
     expect(data.items).toEqual([]);
+    expect(data.narrative).toBe("");
+    expect(data.actionItems).toEqual([]);
   });
 });

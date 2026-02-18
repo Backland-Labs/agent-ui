@@ -41,6 +41,8 @@ export interface LandingNarrativeItem {
 
 export interface LandingNarrativeResponse {
   items: LandingNarrativeItem[];
+  narrative: string;
+  actionItems: string[];
 }
 
 export type LandingNarrativeState = "initial_loading" | "success" | "empty" | "terminal_error";

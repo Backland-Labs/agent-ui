@@ -17,17 +17,13 @@ vi.mock("@/lib/hooks/useCalendarEvents", () => ({
 const mockUseNarrative = vi.mocked(useNarrative);
 type UseNarrativeReturn = ReturnType<typeof useNarrative>;
 
-const sampleNarrative = {
-  threadId: "thread-1",
-  agentName: "Email Agent",
-  title: "Morning follow-up",
-  snippet: "Draft reviewed",
-  lastActivityAt: new Date().toISOString(),
-  lastMessageRole: "assistant" as const,
-};
+const sampleNarrativeText = "48h inbox summary with five unread emails reviewed";
+const sampleActionItem = "Reply to sponsor request";
 
 function buildNarrativeHookReturn(overrides: Partial<UseNarrativeReturn> = {}): UseNarrativeReturn {
   return {
+    narrative: "",
+    actionItems: [],
     narratives: [],
     state: "empty",
     loading: false,
@@ -61,12 +57,13 @@ describe("LandingContent", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders narrative items from the hook", () => {
+  it("renders narrative summary from the hook", () => {
     const refreshNarrative = vi.fn();
 
     mockUseNarrative.mockReturnValue(
       buildNarrativeHookReturn({
-        narratives: [sampleNarrative],
+        narrative: sampleNarrativeText,
+        actionItems: [sampleActionItem],
         state: "success",
         refresh: refreshNarrative,
       })
@@ -74,8 +71,8 @@ describe("LandingContent", () => {
 
     render(<LandingContent />);
 
-    expect(screen.getByText("Morning follow-up")).toBeTruthy();
-    expect(screen.getByText("Draft reviewed")).toBeTruthy();
+    expect(screen.getByText(sampleNarrativeText)).toBeTruthy();
+    expect(screen.getByText(sampleActionItem)).toBeTruthy();
 
     const narrativeSection = screen.getByText("Email Narrative").closest("section");
     if (!narrativeSection) {

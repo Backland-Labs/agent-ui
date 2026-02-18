@@ -21,6 +21,17 @@ function buildOkResponse(body: LandingNarrativeResponse): Response {
   });
 }
 
+function buildNarrativeResponse(
+  overrides: Partial<LandingNarrativeResponse> = {}
+): LandingNarrativeResponse {
+  return {
+    items: [],
+    narrative: "",
+    actionItems: [],
+    ...overrides,
+  };
+}
+
 function createDeferredResponse() {
   let resolvePromise: ((value: Response | PromiseLike<Response>) => void) | null = null;
 
@@ -46,9 +57,11 @@ describe("useNarrative", () => {
   });
 
   it("loads narrative on mount and sets success state", async () => {
-    const payload: LandingNarrativeResponse = {
+    const payload = buildNarrativeResponse({
       items: [buildNarrativeItem("thread-1")],
-    };
+      narrative: "48h inbox summary",
+      actionItems: ["Reply to sponsor"],
+    });
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(buildOkResponse(payload));
 
@@ -64,6 +77,8 @@ describe("useNarrative", () => {
     );
     expect(result.current.state).toBe("success");
     expect(result.current.narratives).toHaveLength(1);
+    expect(result.current.narrative).toBe("48h inbox summary");
+    expect(result.current.actionItems).toEqual(["Reply to sponsor"]);
     expect(result.current.error).toBeNull();
     expect(result.current.refreshError).toBeNull();
   });
@@ -82,6 +97,28 @@ describe("useNarrative", () => {
     expect(result.current.narratives).toEqual([]);
   });
 
+  it("uses success state when summary exists without items", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      buildOkResponse(
+        buildNarrativeResponse({
+          narrative: "High-signal inbox summary",
+          actionItems: ["Reply to event organizer"],
+        })
+      )
+    );
+
+    const { result } = renderHook(() => useNarrative());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.state).toBe("success");
+    expect(result.current.narratives).toEqual([]);
+    expect(result.current.narrative).toBe("High-signal inbox summary");
+    expect(result.current.actionItems).toEqual(["Reply to event organizer"]);
+  });
+
   it("maps non-404 failures to generic terminal error", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("bad", { status: 500 }));
 
@@ -98,9 +135,12 @@ describe("useNarrative", () => {
   it("keeps previous rows and sets refresh overlay error after refresh failure", async () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
-        buildOkResponse({
-          items: [buildNarrativeItem("thread-1")],
-        })
+        buildOkResponse(
+          buildNarrativeResponse({
+            items: [buildNarrativeItem("thread-1")],
+            narrative: "Initial summary",
+          })
+        )
       )
       .mockResolvedValueOnce(new Response("bad", { status: 500 }));
 
@@ -127,9 +167,12 @@ describe("useNarrative", () => {
   it("transitions to terminal_error on 404 during refresh even with prior data", async () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
-        buildOkResponse({
-          items: [buildNarrativeItem("thread-1")],
-        })
+        buildOkResponse(
+          buildNarrativeResponse({
+            items: [buildNarrativeItem("thread-1")],
+            narrative: "Initial summary",
+          })
+        )
       )
       .mockResolvedValueOnce(new Response("missing", { status: 404 }));
 
@@ -159,9 +202,12 @@ describe("useNarrative", () => {
 
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
-        buildOkResponse({
-          items: [buildNarrativeItem("thread-initial")],
-        })
+        buildOkResponse(
+          buildNarrativeResponse({
+            items: [buildNarrativeItem("thread-initial")],
+            narrative: "Initial summary",
+          })
+        )
       )
       .mockImplementationOnce(() => requestA.promise)
       .mockImplementationOnce(() => requestB.promise);
@@ -179,9 +225,12 @@ describe("useNarrative", () => {
 
     await act(async () => {
       requestB.resolve(
-        buildOkResponse({
-          items: [buildNarrativeItem("thread-b")],
-        })
+        buildOkResponse(
+          buildNarrativeResponse({
+            items: [buildNarrativeItem("thread-b")],
+            narrative: "Summary B",
+          })
+        )
       );
       await Promise.resolve();
     });
@@ -190,9 +239,12 @@ describe("useNarrative", () => {
 
     await act(async () => {
       requestA.resolve(
-        buildOkResponse({
-          items: [buildNarrativeItem("thread-a")],
-        })
+        buildOkResponse(
+          buildNarrativeResponse({
+            items: [buildNarrativeItem("thread-a")],
+            narrative: "Summary A",
+          })
+        )
       );
       await Promise.resolve();
     });

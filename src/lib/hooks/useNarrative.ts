@@ -8,6 +8,8 @@ import type {
 } from "@/types";
 
 interface UseNarrativeReturn {
+  narrative: string;
+  actionItems: string[];
   narratives: LandingNarrativeItem[];
   state: LandingNarrativeState;
   loading: boolean;
@@ -32,11 +34,32 @@ function hasStableState(state: LandingNarrativeState): boolean {
   return state === "success" || state === "empty";
 }
 
-function toNarrativeState(items: LandingNarrativeItem[]): LandingNarrativeState {
-  return items.length > 0 ? "success" : "empty";
+function normalizeActionItems(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
+function toNarrativeState(
+  items: LandingNarrativeItem[],
+  narrative: string,
+  actionItems: string[]
+): LandingNarrativeState {
+  if (narrative.length > 0 || actionItems.length > 0 || items.length > 0) {
+    return "success";
+  }
+
+  return "empty";
 }
 
 export function useNarrative(): UseNarrativeReturn {
+  const [narrative, setNarrative] = useState("");
+  const [actionItems, setActionItems] = useState<string[]>([]);
   const [narratives, setNarratives] = useState<LandingNarrativeItem[]>([]);
   const [state, setState] = useState<LandingNarrativeState>("initial_loading");
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +110,8 @@ export function useNarrative(): UseNarrativeReturn {
           if (isRefreshRequest && response.status !== 404) {
             setRefreshError(mappedError);
           } else {
+            setNarrative("");
+            setActionItems([]);
             setNarratives([]);
             setNarrativeState("terminal_error");
             setError(mappedError);
@@ -102,9 +127,13 @@ export function useNarrative(): UseNarrativeReturn {
         }
 
         const items = Array.isArray(data.items) ? data.items : [];
+        const nextNarrative = typeof data.narrative === "string" ? data.narrative.trim() : "";
+        const nextActionItems = normalizeActionItems(data.actionItems);
 
+        setNarrative(nextNarrative);
+        setActionItems(nextActionItems);
         setNarratives(items);
-        setNarrativeState(toNarrativeState(items));
+        setNarrativeState(toNarrativeState(items, nextNarrative, nextActionItems));
         setError(null);
         setRefreshError(null);
       } catch (err) {
@@ -122,6 +151,8 @@ export function useNarrative(): UseNarrativeReturn {
         }
 
         setNarratives([]);
+        setNarrative("");
+        setActionItems([]);
         setNarrativeState("terminal_error");
         setError(GENERIC_ERROR_MESSAGE);
       } finally {
@@ -148,6 +179,8 @@ export function useNarrative(): UseNarrativeReturn {
   }, [fetchNarrative]);
 
   return {
+    narrative,
+    actionItems,
     narratives,
     state,
     loading: state === "initial_loading",

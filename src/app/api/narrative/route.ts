@@ -18,6 +18,11 @@ const EPOCH_ISO = "1970-01-01T00:00:00.000Z";
 const SSE_SEPARATOR_REGEX = /\r?\n\r?\n/;
 const SSE_LINE_REGEX = /\r?\n/;
 
+interface NarrativeSummary {
+  narrative: string;
+  actionItems: string[];
+}
+
 function toNarrativeEndpoint(endpointUrl: string): string {
   const normalizedEndpoint = endpointUrl.replace(/\/$/, "");
   const serviceRoot = normalizedEndpoint.replace(/\/agent$/, "");
@@ -82,8 +87,8 @@ function getNestedCandidates(value: unknown): unknown[] {
   return nested;
 }
 
-function extractSseCandidates(bodyText: string): unknown[] {
-  const candidates: unknown[] = [];
+function parseSseEvents(bodyText: string): Record<string, unknown>[] {
+  const events: Record<string, unknown>[] = [];
 
   for (const chunk of bodyText.split(SSE_SEPARATOR_REGEX)) {
     if (!chunk.trim()) {
@@ -100,35 +105,66 @@ function extractSseCandidates(bodyText: string): unknown[] {
     }
 
     const parsedData = tryParseJson(dataLines.join("\n"));
-    if (parsedData === null) {
+    if (!parsedData || typeof parsedData !== "object" || Array.isArray(parsedData)) {
       continue;
     }
 
-    candidates.push(parsedData, ...getNestedCandidates(parsedData));
+    events.push(parsedData as Record<string, unknown>);
+  }
+
+  return events;
+}
+
+function collectCandidates(directJson: unknown, sseEvents: Record<string, unknown>[]): unknown[] {
+  const candidates: unknown[] = [];
+
+  if (directJson !== null) {
+    candidates.push(directJson, ...getNestedCandidates(directJson));
+  }
+
+  for (const event of sseEvents) {
+    candidates.push(event, ...getNestedCandidates(event));
   }
 
   return candidates;
 }
 
-function extractNarrativePayload(bodyText: string): unknown {
-  const trimmed = bodyText.trim();
+function extractNarrativePayload(bodyText: string): {
+  payload: unknown;
+  narrative: string;
+  actionItems: string[];
+} {
+  const trimmedBody = bodyText.trim();
 
-  if (!trimmed) {
-    return [];
+  if (!trimmedBody) {
+    return {
+      payload: [],
+      narrative: "",
+      actionItems: [],
+    };
   }
 
-  const directJson = tryParseJson(trimmed);
-  if (directJson !== null) {
-    return directJson;
-  }
+  const directJson = tryParseJson(trimmedBody);
+  const sseEvents = directJson === null ? parseSseEvents(trimmedBody) : [];
+  const candidates = collectCandidates(directJson, sseEvents);
 
-  for (const candidate of extractSseCandidates(trimmed)) {
-    if (hasRecordPayload(candidate)) {
-      return candidate;
-    }
-  }
+  const payload = candidates.find(hasRecordPayload) ?? [];
+  const summary =
+    candidates
+      .map(extractNarrativeSummary)
+      .find((value): value is NarrativeSummary => value !== null) ?? null;
 
-  return [];
+  const streamNarrative = sseEvents
+    .filter((event) => event.type === "TEXT_MESSAGE_CONTENT")
+    .map((event) => (typeof event.delta === "string" ? event.delta : ""))
+    .join("")
+    .trim();
+
+  return {
+    payload,
+    narrative: summary?.narrative || streamNarrative,
+    actionItems: summary?.actionItems ?? [],
+  };
 }
 
 function sanitizeRole(role: string | null | undefined): "user" | "assistant" | "system" | null {
@@ -148,6 +184,54 @@ function pickString(record: Record<string, unknown>, keys: string[]): string | u
   }
 
   return undefined;
+}
+
+function normalizeActionItems(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const items: string[] = [];
+
+  for (const item of value) {
+    if (typeof item === "string" && item.trim()) {
+      items.push(item.trim());
+      continue;
+    }
+
+    if (item && typeof item === "object") {
+      const fallbackValue = pickString(item as Record<string, unknown>, [
+        "text",
+        "title",
+        "summary",
+      ]);
+
+      if (fallbackValue) {
+        items.push(fallbackValue.trim());
+      }
+    }
+  }
+
+  return items;
+}
+
+function extractNarrativeSummary(value: unknown): NarrativeSummary | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const narrative = pickString(record, ["narrative", "summary", "text"])?.trim() || "";
+  const actionItems = normalizeActionItems(record.actionItems ?? record.action_items);
+
+  if (!narrative && actionItems.length === 0) {
+    return null;
+  }
+
+  return {
+    narrative,
+    actionItems,
+  };
 }
 
 function pickDateIso(record: Record<string, unknown>, keys: string[]): string {
@@ -301,10 +385,13 @@ export async function handleGetNarrative(
     }
 
     const bodyText = await response.text();
-    const items = mapItems(extractNarrativePayload(bodyText));
+    const extractedPayload = extractNarrativePayload(bodyText);
+    const items = mapItems(extractedPayload.payload);
 
     const responseBody: LandingNarrativeResponse = {
       items,
+      narrative: extractedPayload.narrative,
+      actionItems: extractedPayload.actionItems,
     };
 
     log.info(
@@ -312,6 +399,8 @@ export async function handleGetNarrative(
         event: "narrative.completed",
         durationMs: Date.now() - startedAt,
         itemCount: items.length,
+        actionItemCount: responseBody.actionItems.length,
+        narrativeLength: responseBody.narrative.length,
       },
       "narrative request completed"
     );

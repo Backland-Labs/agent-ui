@@ -21,7 +21,8 @@ export function LandingContent() {
     refresh: refreshCalendar,
   } = useCalendarEvents();
   const {
-    narratives,
+    narrative,
+    actionItems,
     state: narrativeState,
     error: narrativeTerminalError,
     refreshError: narrativeRefreshError,
@@ -40,7 +41,8 @@ export function LandingContent() {
 
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <AgentInboxPreview
-          items={narratives}
+          narrative={narrative}
+          actionItems={actionItems}
           state={narrativeState}
           terminalError={narrativeTerminalError}
           refreshError={narrativeRefreshError}
